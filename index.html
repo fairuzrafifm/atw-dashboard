@@ -11149,7 +11149,7 @@ document.addEventListener('visibilitychange',()=>{
     t._tid = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.style.display = 'none', 300); }, 3000);
   }
 
-  function getSb() { return (typeof sb !== 'undefined' ? sb : null) || window.sb || null; }
+  function getSb() { return window.sb || null; }
 
   // ── HALAMAN REGISTRASI ────────────────────────────────────
   function injectRegisterLink() {
@@ -11287,17 +11287,23 @@ document.addEventListener('visibilitychange',()=>{
   };
 
   async function _loadUsers() {
-    const sb = getSb(); if (!sb) return;
+    const client = (typeof sb !== 'undefined' ? sb : null) || window.sb;
     const pEl = document.getElementById('_pendingList');
     const aEl = document.getElementById('_activeList');
 
-    try {
-      const [{ data: pending }, { data: active }] = await Promise.all([
-        sb.from('user_profiles').select('*').eq('role', 'pending').order('created_at', { ascending: false }),
-        sb.from('user_profiles').select('*').neq('role', 'pending').order('created_at', { ascending: false })
-      ]);
+    if (!client) {
+      if (pEl) pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: Supabase tidak tersedia. Coba refresh halaman.</div>';
+      return;
+    }
 
-      pEl.innerHTML = (pending && pending.length)
+    try {
+      const { data: pending, error: e1 } = await client.from('user_profiles').select('*').eq('role','pending').order('created_at',{ascending:false});
+      const { data: active,  error: e2 } = await client.from('user_profiles').select('*').neq('role','pending').order('created_at',{ascending:false});
+
+      if (e1) throw e1;
+      if (e2) throw e2;
+
+      if (pEl) pEl.innerHTML = (pending && pending.length)
         ? pending.map(u => `
           <div style="background:var(--sf2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
             <div style="flex:1;min-width:0">
@@ -11309,7 +11315,7 @@ document.addEventListener('visibilitychange',()=>{
           </div>`).join('')
         : '<div style="font-size:12px;color:var(--mt);padding:6px">Tidak ada pendaftaran baru ✓</div>';
 
-      aEl.innerHTML = (active && active.length)
+      if (aEl) aEl.innerHTML = (active && active.length)
         ? active.map(u => `
           <div style="background:var(--sf2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
             <div style="flex:1;min-width:0">
@@ -11326,7 +11332,7 @@ document.addEventListener('visibilitychange',()=>{
         : '<div style="font-size:12px;color:var(--mt);padding:6px">Belum ada user aktif</div>';
 
     } catch (e) {
-      pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: ' + e.message + '</div>';
+      if (pEl) pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: ' + (e.message || JSON.stringify(e)) + '</div>';
     }
   }
 
