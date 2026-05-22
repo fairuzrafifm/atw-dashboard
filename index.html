@@ -11550,5 +11550,579 @@ document.addEventListener('visibilitychange',()=>{
 })();
 
 </script>
+
+<script>
+// ============================================================
+// SUPABASE FULL MIGRATION PATCH v1.0
+// Menggantikan semua GSheet sync dengan Supabase
+// Append sebelum </body> — jangan hapus script di atasnya
+// ============================================================
+(function () {
+  'use strict';
+
+  // ── 1. MATIKAN GSHEET SYNC & POLLING ────────────────────
+  // gsSync menjadi no-op — semua save kini langsung ke Supabase per fungsi
+  window.gsSync = function () {};
+  // Hentikan polling GSheet setiap 15 detik
+  window._rtPoll = async function () {};
+
+  // Sembunyikan badge & tombol GSheet dari header/toolbar
+  function _hideGsUI() {
+    const ids = ['gsBadge', 'btnSync', 'btnLoad'];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+  }
+  setTimeout(_hideGsUI, 800);
+
+  // ── 2. HELPER: status bar Supabase ──────────────────────
+  function _sbStatusOk() {
+    try {
+      const dot = document.getElementById('sdot');
+      const msg = document.getElementById('smsg');
+      const bar = document.getElementById('sbar');
+      if (dot) { dot.style.background = 'var(--gn)'; dot.classList.remove('unsaved'); }
+      if (msg) msg.textContent = 'Tersimpan ke Supabase ✓ · ' + new Date().toLocaleTimeString('id-ID');
+      if (bar) bar.classList.remove('dirty');
+      if (typeof isDirty !== 'undefined') window.isDirty = false;
+    } catch (e) {}
+  }
+
+  function _sbStatusErr(msg) {
+    try {
+      const dot = document.getElementById('sdot');
+      const smsg = document.getElementById('smsg');
+      if (dot) dot.style.background = 'var(--rd)';
+      if (smsg) smsg.textContent = '⚠ Gagal simpan: ' + (msg || 'cek koneksi');
+    } catch (e) {}
+  }
+
+  // ── 3. CENTRAL SUPABASE PERSIST ─────────────────────────
+  async function _sbPersist(type, action, data) {
+    const client = (typeof _initSb === 'function') ? _initSb() : null;
+    if (!client) { console.warn('[sbPersist] client null'); return; }
+    try {
+      switch (type) {
+
+        case 'project':
+          if (action === 'save') await sbSaveProject(data);
+          else if (action === 'delete')
+            await client.from('projects').delete().eq('id', data.id);
+          break;
+
+        case 'history':
+          // data = { projId, history[] }
+          if (action === 'save') await sbSaveHistory(data.projId, data.history || []);
+          break;
+
+        case 'issue':
+          if (action === 'save') await sbSaveIssue(data);
+          else if (action === 'delete') await sbDeleteIssue(data.id);
+          break;
+
+        case 'procurement':
+          if (action === 'save') await sbSaveProcurement(data);
+          else if (action === 'delete')
+            await client.from('procurement').delete().eq('id', data.id);
+          break;
+
+        case 'cost':
+          if (action === 'save') await sbSaveCost(data);
+          else if (action === 'delete')
+            await client.from('costs').update({ _deleted: true }).eq('id', data.id);
+          break;
+
+        case 'manpower':
+          if (action === 'save') await sbSaveManpower(data);
+          else if (action === 'delete')
+            await client.from('manpower_logs').delete().eq('id', data.id);
+          break;
+
+        case 'accident':
+          if (action === 'save') await sbSaveAccident(data);
+          else if (action === 'delete')
+            await client.from('accident_logs').delete().eq('id', data.id);
+          break;
+
+        case 'wbs':
+          if (action === 'save') await sbSaveWbs(data);
+          else if (action === 'delete')
+            await client.from('wbs').delete().eq('id', data.id);
+          break;
+
+        case 'wbs_bulk':
+          // data = array of WBS nodes
+          if (action === 'save')
+            await Promise.all(data.map(n => sbSaveWbs(n)));
+          else if (action === 'delete')
+            await Promise.all(data.map(n => client.from('wbs').delete().eq('id', n.id)));
+          break;
+
+        case 'scurve':
+          if (action === 'save') await sbSaveScurve(data);
+          else if (action === 'delete')
+            await client.from('scurve').delete().eq('proj_id', data.projId).eq('week', data.week);
+          break;
+
+        case 'rab':
+          if (action === 'save') await sbSaveRab(Array.isArray(data) ? data : [data]);
+          else if (action === 'delete')
+            await client.from('rab').delete().eq('id', data.id);
+          break;
+
+        case 'rab_bulk':
+          if (action === 'save') await sbSaveRab(data);
+          break;
+      }
+      _sbStatusOk();
+    } catch (e) {
+      console.warn('[sbPersist]', type, action, e.message);
+      _sbStatusErr(e.message);
+    }
+  }
+  window._sbPersist = _sbPersist;
+
+  // ── 4. OVERRIDE autoLoadOnStart → Supabase ───────────────
+  window.autoLoadOnStart = async function () {
+    // Tampilkan cache lokal dulu (instant)
+    try {
+      if (typeof loadLocal === 'function' && loadLocal()) {
+        if (typeof loadLogosCache === 'function') loadLogosCache();
+        if (typeof P !== 'undefined' && P.length && !selId) selId = P[0]?.id || null;
+        if (typeof render === 'function') render();
+      }
+    } catch (e) {}
+
+    // Update status bar
+    const smsg = document.getElementById('smsg');
+    const sdot = document.getElementById('sdot');
+    if (smsg) smsg.textContent = 'Menghubungkan ke Supabase...';
+    if (sdot) sdot.style.background = 'var(--yw)';
+
+    // Load dari Supabase
+    try {
+      if (typeof loadFromSupabase === 'function') {
+        await loadFromSupabase();
+        if (smsg) smsg.textContent = 'Data dimuat dari Supabase ✓';
+        if (sdot) { sdot.style.background = 'var(--gn)'; sdot.classList.remove('unsaved'); }
+      }
+    } catch (e) {
+      console.warn('[autoLoadOnStart] Supabase error:', e);
+      if (smsg) smsg.textContent = '⚠ Gagal terhubung ke Supabase';
+    }
+  };
+
+  // ── 5. PROJECT ──────────────────────────────────────────
+  const _orig_saveProj = window.saveProj;
+  window.saveProj = async function () {
+    const prevId = typeof editProjId !== 'undefined' ? editProjId : null;
+    _orig_saveProj.call(this);
+    const proj = prevId ? P.find(p => p.id === prevId) : P[P.length - 1];
+    if (proj) await _sbPersist('project', 'save', proj);
+  };
+
+  const _orig_doDelProj = window._doDelProj;
+  window._doDelProj = async function () {
+    const pid = typeof editProjId !== 'undefined' ? editProjId : null;
+    _orig_doDelProj.call(this);
+    if (pid) await _sbPersist('project', 'delete', { id: pid });
+  };
+
+  const _orig_executeCloneProject = window.executeCloneProject;
+  window.executeCloneProject = async function () {
+    const prevLen = P.length;
+    const prevWbsLen = WBS.length;
+    _orig_executeCloneProject.call(this);
+    const newProj = P[P.length - 1];
+    if (newProj && P.length > prevLen) {
+      await _sbPersist('project', 'save', newProj);
+      const newWbs = WBS.slice(prevWbsLen);
+      if (newWbs.length) await _sbPersist('wbs_bulk', 'save', newWbs);
+    }
+  };
+
+  const _orig_saveUpdate = window.saveUpdate;
+  window.saveUpdate = async function () {
+    _orig_saveUpdate.call(this);
+    const p = (typeof selId !== 'undefined') ? P.find(x => x.id === selId) : null;
+    if (p) {
+      await _sbPersist('project', 'save', p);
+      if (p.history?.length) await _sbPersist('history', 'save', { projId: p.id, history: p.history });
+    }
+  };
+
+  const _orig_saveWeather = window.saveWeather;
+  window.saveWeather = async function () {
+    _orig_saveWeather.call(this);
+    await Promise.all(P.map(p => _sbPersist('project', 'save', p)));
+  };
+
+  // History edit/delete
+  const _orig_saveHistEntry = window.saveHistEntry;
+  window.saveHistEntry = async function () {
+    const projId = document.getElementById('ehProjId')?.value;
+    _orig_saveHistEntry.call(this);
+    const p = projId ? P.find(x => String(x.id) === String(projId)) : null;
+    if (p) {
+      await _sbPersist('history', 'save', { projId: p.id, history: p.history });
+      await _sbPersist('project', 'save', p);
+    }
+  };
+
+  const _orig_doDelHist = window._doDelHist;
+  window._doDelHist = async function (projId, idx) {
+    _orig_doDelHist.call(this, projId, idx);
+    const p = P.find(x => x.id === projId);
+    if (p) await _sbPersist('history', 'save', { projId: p.id, history: p.history });
+  };
+
+  // ── 6. MANPOWER ──────────────────────────────────────────
+  const _orig_saveMp = window.saveMp;
+  window.saveMp = async function () {
+    const projId = document.getElementById('mpProj')?.value || '';
+    const date = document.getElementById('mpDate')?.value || new Date().toISOString().slice(0, 10);
+    _orig_saveMp.call(this);
+    const entry = MPLOGS.find(m => String(m.projId) === String(projId) && m.date === date);
+    if (entry) await _sbPersist('manpower', 'save', entry);
+  };
+
+  const _orig_delMpLog = window.delMpLog;
+  window.delMpLog = async function (id) {
+    const target = id || (typeof editMpId !== 'undefined' ? editMpId : null);
+    _orig_delMpLog.call(this, id);
+    if (target) await _sbPersist('manpower', 'delete', { id: target });
+  };
+
+  // ── 7. ACCIDENT ──────────────────────────────────────────
+  const _orig_saveAcc = window.saveAcc;
+  window.saveAcc = async function () {
+    _orig_saveAcc.call(this);
+    const entry = ACCLOGS[ACCLOGS.length - 1];
+    if (entry) await _sbPersist('accident', 'save', entry);
+  };
+
+  const _orig_saveAccEdit = window.saveAccEdit;
+  window.saveAccEdit = async function () {
+    const eaId = document.getElementById('eaId')?.value;
+    _orig_saveAccEdit.call(this);
+    const entry = eaId ? ACCLOGS.find(a => String(a.id) === String(eaId)) : null;
+    if (entry) await _sbPersist('accident', 'save', entry);
+  };
+
+  const _orig_delAccLog = window.delAccLog;
+  window.delAccLog = async function () {
+    const eaId = document.getElementById('eaId')?.value;
+    _orig_delAccLog.call(this);
+    if (eaId) await _sbPersist('accident', 'delete', { id: eaId });
+  };
+
+  // ── 8. ISSUES ────────────────────────────────────────────
+  const _orig_saveIss = window.saveIss;
+  window.saveIss = async function () {
+    const prevId = typeof editIssId !== 'undefined' ? editIssId : null;
+    _orig_saveIss.call(this);
+    const iss = prevId ? ISS.find(x => String(x.id) === String(prevId))
+                       : ISS[ISS.length - 1];
+    if (iss) await _sbPersist('issue', 'save', iss);
+  };
+
+  window.delIss = function () {
+    const id = typeof editIssId !== 'undefined' ? editIssId : null;
+    if (typeof showConfirm === 'function') {
+      showConfirm('Hapus issue ini?', async () => {
+        if (typeof ISS !== 'undefined')
+          window.ISS = ISS.filter(i => String(i.id) !== String(id));
+        if (typeof dirty === 'function') dirty();
+        if (typeof cm === 'function') cm('addIssue');
+        if (typeof renderIssues === 'function') renderIssues();
+        if (typeof toast === 'function') toast('Issue dihapus', 'warn');
+        if (id) await _sbPersist('issue', 'delete', { id });
+      });
+    }
+  };
+
+  // ── 9. PROCUREMENT ───────────────────────────────────────
+  const _orig_saveProc = window.saveProc;
+  window.saveProc = async function () {
+    const prevId = typeof editProcId !== 'undefined' ? editProcId : null;
+    _orig_saveProc.call(this);
+    const proc = prevId ? PROC.find(x => String(x.id) === String(prevId))
+                        : PROC[PROC.length - 1];
+    if (proc) await _sbPersist('procurement', 'save', proc);
+  };
+
+  window.delProc = function () {
+    const id = typeof editProcId !== 'undefined' ? editProcId : null;
+    if (typeof showConfirm === 'function') {
+      showConfirm('Hapus item ini?', async () => {
+        if (typeof PROC !== 'undefined')
+          window.PROC = PROC.filter(p => String(p.id) !== String(id));
+        if (typeof dirty === 'function') dirty();
+        if (typeof cm === 'function') cm('addProc');
+        if (typeof renderProc === 'function') renderProc();
+        if (typeof toast === 'function') toast('Item dihapus', 'warn');
+        if (id) await _sbPersist('procurement', 'delete', { id });
+      });
+    }
+  };
+
+  // ── 10. COST ─────────────────────────────────────────────
+  const _orig_saveCost = window.saveCost;
+  window.saveCost = async function () {
+    const prevId = typeof editCostId !== 'undefined' ? editCostId : null;
+    _orig_saveCost.call(this);
+    const cost = prevId ? COSTS.find(x => String(x.id) === String(prevId))
+                        : COSTS[COSTS.length - 1];
+    if (cost) await _sbPersist('cost', 'save', cost);
+  };
+
+  const _orig_delCost = window.delCost;
+  window.delCost = async function () {
+    const id = typeof editCostId !== 'undefined' ? editCostId : null;
+    _orig_delCost.call(this);
+    if (id) await _sbPersist('cost', 'delete', { id });
+  };
+
+  // ── 11. RAB ──────────────────────────────────────────────
+  const _orig_saveRabKat = window.saveRabKat;
+  window.saveRabKat = async function () {
+    _orig_saveRabKat.call(this);
+    const item = RAB[RAB.length - 1];
+    if (item) await _sbPersist('rab', 'save', item);
+  };
+
+  window.delRabKat = function () {
+    const id = document.getElementById('rabKatId')?.value ||
+               (typeof editRabKatId !== 'undefined' ? editRabKatId : null);
+    if (typeof showConfirm === 'function') {
+      showConfirm('Hapus kategori & semua isinya?', async () => {
+        const toRm = new Set();
+        toRm.add(String(id));
+        (typeof RAB !== 'undefined' ? RAB : [])
+          .filter(r => String(r.katId) === String(id) || String(r.id) === String(id))
+          .forEach(r => toRm.add(String(r.id)));
+        window.RAB = RAB.filter(r => !toRm.has(String(r.id)));
+        if (typeof dirty === 'function') dirty();
+        if (typeof cm === 'function') cm('addRabKat');
+        if (typeof renderRab === 'function') renderRab();
+        if (typeof toast === 'function') toast('Kategori dihapus', 'warn');
+        await Promise.all([...toRm].map(rid => _sbPersist('rab', 'delete', { id: rid })));
+      });
+    }
+  };
+
+  const _orig_saveRabItem = window.saveRabItem;
+  window.saveRabItem = async function () {
+    _orig_saveRabItem.call(this);
+    const item = RAB[RAB.length - 1];
+    if (item) await _sbPersist('rab', 'save', item);
+  };
+
+  window.delRabItem = function () {
+    const id = document.getElementById('rabItemId')?.value ||
+               (typeof editRabItemId !== 'undefined' ? editRabItemId : null);
+    if (typeof showConfirm === 'function') {
+      showConfirm('Hapus item RAB ini?', async () => {
+        window.RAB = RAB.filter(r => String(r.id) !== String(id));
+        if (typeof dirty === 'function') dirty();
+        if (typeof cm === 'function') cm('addRabItem');
+        if (typeof renderRab === 'function') renderRab();
+        if (typeof toast === 'function') toast('Item RAB dihapus', 'warn');
+        if (id) await _sbPersist('rab', 'delete', { id });
+      });
+    }
+  };
+
+  const _orig_executeCloneRab = window.executeCloneRab;
+  window.executeCloneRab = async function () {
+    const prevLen = typeof RAB !== 'undefined' ? RAB.length : 0;
+    if (_orig_executeCloneRab) _orig_executeCloneRab.call(this);
+    const newItems = RAB.slice(prevLen);
+    if (newItems.length) await _sbPersist('rab_bulk', 'save', newItems);
+  };
+
+  // ── 12. WBS ──────────────────────────────────────────────
+  const _orig_saveWbsCat = window.saveWbsCat;
+  window.saveWbsCat = async function () {
+    _orig_saveWbsCat.call(this);
+    const node = WBS[WBS.length - 1];
+    if (node) await _sbPersist('wbs', 'save', node);
+  };
+
+  const _orig_saveWbsSub = window.saveWbsSub;
+  window.saveWbsSub = async function () {
+    _orig_saveWbsSub.call(this);
+    const node = WBS[WBS.length - 1];
+    if (node) await _sbPersist('wbs', 'save', node);
+  };
+
+  const _orig_saveWbsItem = window.saveWbsItem;
+  window.saveWbsItem = async function () {
+    _orig_saveWbsItem.call(this);
+    const node = WBS[WBS.length - 1];
+    if (node) await _sbPersist('wbs', 'save', node);
+  };
+
+  const _orig_saveEditWbs = window.saveEditWbs;
+  window.saveEditWbs = async function () {
+    const id = document.getElementById('wbsEditId')?.value;
+    _orig_saveEditWbs.call(this);
+    const node = id ? WBS.find(w => String(w.id) === String(id)) : null;
+    if (node) await _sbPersist('wbs', 'save', node);
+  };
+
+  window.delWbs = function (id) {
+    const sid = String(id);
+    const node = WBS.find(w => w.id === sid); if (!node) return;
+    const childIds = WBS.filter(w => String(w.parentId) === sid).map(w => String(w.id));
+    const grandIds = WBS.filter(w => childIds.includes(String(w.parentId))).map(w => String(w.id));
+    const toRm = new Set([sid, ...childIds, ...grandIds]);
+    const msg = `Hapus "${(node.name||'').slice(0,30)}"${toRm.size > 1 ? ' dan ' + (toRm.size - 1) + ' child-nya' : ''}?`;
+    if (typeof showConfirm === 'function') {
+      showConfirm(msg, async () => {
+        window.WBS = WBS.filter(w => !toRm.has(String(w.id)));
+        if (typeof dirty === 'function') dirty();
+        if (typeof renderWBS === 'function') renderWBS();
+        if (typeof toast === 'function') toast('Dihapus', 'warn');
+        await Promise.all([...toRm].map(wid => _sbPersist('wbs', 'delete', { id: wid })));
+      });
+    }
+  };
+
+  const _orig_saveWbsPlanGrid = window.saveWbsPlanGrid;
+  window.saveWbsPlanGrid = async function () {
+    const projId = document.getElementById('wbsPlanProj')?.value || '';
+    _orig_saveWbsPlanGrid.call(this);
+    const nodes = WBS.filter(w => String(w.projId) === String(projId));
+    if (nodes.length) await _sbPersist('wbs_bulk', 'save', nodes);
+    // Juga simpan project (plan% terupdate)
+    const proj = P.find(p => String(p.id) === String(projId));
+    if (proj) await _sbPersist('project', 'save', proj);
+  };
+
+  const _orig_saveWbsProgress = window.saveWbsProgress;
+  window.saveWbsProgress = async function () {
+    const projId = document.getElementById('wbsProgProj')?.value || selId || '';
+    _orig_saveWbsProgress.call(this);
+    const nodes = WBS.filter(w => String(w.projId) === String(projId));
+    if (nodes.length) await _sbPersist('wbs_bulk', 'save', nodes);
+    const proj = P.find(p => String(p.id) === String(projId));
+    if (proj) {
+      await _sbPersist('project', 'save', proj);
+      if (proj.history?.length) await _sbPersist('history', 'save', { projId: proj.id, history: proj.history });
+    }
+  };
+
+  // WBS inline & daily logs
+  const _orig_saveWbsInlineDate = window.saveWbsInlineDate;
+  if (_orig_saveWbsInlineDate) {
+    window.saveWbsInlineDate = async function (nodeId, field, val) {
+      _orig_saveWbsInlineDate.call(this, nodeId, field, val);
+      const node = WBS.find(w => String(w.id) === String(nodeId));
+      if (node) await _sbPersist('wbs', 'save', node);
+    };
+  }
+
+  const _orig_saveWbsInlineText = window.saveWbsInlineText;
+  if (_orig_saveWbsInlineText) {
+    window.saveWbsInlineText = async function (nodeId, field, val) {
+      _orig_saveWbsInlineText.call(this, nodeId, field, val);
+      const node = WBS.find(w => String(w.id) === String(nodeId));
+      if (node) await _sbPersist('wbs', 'save', node);
+    };
+  }
+
+  // saveDailyLog (per-item)
+  const _orig_saveDailyLog = window.saveDailyLog;
+  if (_orig_saveDailyLog) {
+    window.saveDailyLog = async function (itemId) {
+      _orig_saveDailyLog.call(this, itemId);
+      const node = WBS.find(w => String(w.id) === String(itemId));
+      if (node) await _sbPersist('wbs', 'save', node);
+    };
+  }
+
+  // saveDrQtySetup
+  const _orig_saveDrQtySetup = window.saveDrQtySetup;
+  window.saveDrQtySetup = async function () {
+    const projId = document.getElementById('drSetupProj')?.value || '';
+    _orig_saveDrQtySetup.call(this);
+    const nodes = WBS.filter(w => String(w.projId) === String(projId));
+    if (nodes.length) await _sbPersist('wbs_bulk', 'save', nodes);
+  };
+
+  // saveAllDailyLogs (bulk)
+  const _orig_saveAllDailyLogs = window.saveAllDailyLogs;
+  if (_orig_saveAllDailyLogs) {
+    window.saveAllDailyLogs = async function () {
+      const projId = document.getElementById('wbsDailyProj')?.value || '';
+      _orig_saveAllDailyLogs.call(this);
+      const nodes = WBS.filter(w => String(w.projId) === String(projId));
+      if (nodes.length) await _sbPersist('wbs_bulk', 'save', nodes);
+      const proj = P.find(p => String(p.id) === String(projId));
+      if (proj) {
+        await _sbPersist('project', 'save', proj);
+        const sc = SCURVE.find(s => String(s.projId) === String(projId));
+        if (sc) await _sbPersist('scurve', 'save', sc);
+      }
+    };
+  }
+
+  // ── 13. S-CURVE ──────────────────────────────────────────
+  const _orig_doSaveSCurveActual = window._doSaveSCurveActual;
+  window._doSaveSCurveActual = async function (projId, week, wAct, cAct) {
+    _orig_doSaveSCurveActual.call(this, projId, week, wAct, cAct);
+    const entry = SCURVE.find(d => String(d.projId) === String(projId) && d.week === week);
+    if (entry) await _sbPersist('scurve', 'save', entry);
+    const proj = P.find(p => String(p.id) === String(projId));
+    if (proj) {
+      await _sbPersist('project', 'save', proj);
+      if (proj.history?.length) await _sbPersist('history', 'save', { projId: proj.id, history: proj.history });
+    }
+  };
+
+  // S-curve plan save (the function ending at line 7599)
+  const _orig_doSaveSCurvePlan = window._doSaveSCurvePlan;
+  if (_orig_doSaveSCurvePlan) {
+    window._doSaveSCurvePlan = async function (...args) {
+      _orig_doSaveSCurvePlan.apply(this, args);
+    };
+  }
+
+  // delScWeek
+  const _orig_doDelScWeek = window._doDelScWeek;
+  window._doDelScWeek = async function (projId, week) {
+    _orig_doDelScWeek.call(this, projId, week);
+    await _sbPersist('scurve', 'delete', { projId, week });
+  };
+
+  // ── 14. PATCH SAVE SCURVE PLAN (line ~7600) ──────────────
+  // Function di baris 7597-7600 tidak punya nama window-level yang bisa di-override mudah.
+  // Kita override dengan mengecek context ketika gsSync dipanggil — sudah di-no-op.
+  // Fallback: save semua SCURVE untuk projId tersebut setelah scPlan modal ditutup.
+  const _origCmFn = window.cm;
+  if (_origCmFn) {
+    window.cm = function (modalName) {
+      _origCmFn.call(this, modalName);
+      // Setelah tutup modal scPlan, sync S-Curve + project ke Supabase
+      if (modalName === 'scPlan') {
+        setTimeout(async () => {
+          const projSel = document.getElementById('scPlanProj');
+          const projId = projSel?.value || selId;
+          if (!projId) return;
+          const entries = SCURVE.filter(s => String(s.projId) === String(projId));
+          await Promise.all(entries.map(e => _sbPersist('scurve', 'save', e)));
+          const proj = P.find(p => String(p.id) === String(projId));
+          if (proj) await _sbPersist('project', 'save', proj);
+        }, 300);
+      }
+    };
+  }
+
+  console.log('✅ Supabase Migration Patch loaded — GSheet sync disabled');
+
+})();
+</script>
 </body>
 </html>
