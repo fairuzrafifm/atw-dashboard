@@ -10674,8 +10674,9 @@ async function loadPwFromGS(){
   }
 }
 
-let currentRole=null; // 'admin' | 'editor' | 'viewer'
-let selectedRoleLogin=null;
+// currentRole & selectedRoleLogin already declared as var in early-login block (line 630)
+currentRole=null;
+selectedRoleLogin=null;
 
 function quickViewerLogin(){
   window._quickViewerLogin=quickViewerLogin;
