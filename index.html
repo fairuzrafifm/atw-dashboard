@@ -11149,7 +11149,7 @@ document.addEventListener('visibilitychange',()=>{
     t._tid = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.style.display = 'none', 300); }, 3000);
   }
 
-  function getSb() { return window.sb || null; }
+  function getSb() { return (typeof sb !== 'undefined' ? sb : null) || window.sb || null; }
 
   // ── HALAMAN REGISTRASI ────────────────────────────────────
   function injectRegisterLink() {
