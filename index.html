@@ -2504,8 +2504,9 @@ const _DEFAULT_GS_URL='https://script.google.com/macros/s/AKfycbxTbt9evowelUh1zm
 // ============================================================
 
 // ── 0. CONFIG — isi setelah buat project di supabase.com ──
-const SUPABASE_URL  = 'https://mbdhnrhoqwljhtkavsrr.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1iZGhucmhvcXdsamh0a2F2c3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNjIzMDgsImV4cCI6MjA5NDczODMwOH0.N2mTpEcOkzPHYkLJMf9L5vIwZTjvZXUaOeMXcX9sJ_o'; // ← ganti dengan anon/public key dari tab Legacy
+// SUPABASE_URL sudah dideklarasikan di atas (var)
+    var _SB_URL = 'https://mbdhnrhoqwljhtkavsrr.supabase.co';
+var _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1iZGhucmhvcXdsamh0a2F2c3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNjIzMDgsImV4cCI6MjA5NDczODMwOH0.N2mTpEcOkzPHYkLJMf9L5vIwZTjvZXUaOeMXcX9sJ_o';
 
 // ── 1. INIT CLIENT ──
 // Tambahkan di <head>:
@@ -2515,7 +2516,9 @@ function _initSb(){
   if(sb) return sb;
   try{
     const { createClient } = supabase;
-    sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+    var sbUrl = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : _SB_URL);
+    var sbAnon = (typeof SUPABASE_ANON !== 'undefined' ? SUPABASE_ANON : _SB_ANON);
+    sb = createClient(sbUrl, sbAnon);
   }catch(e){ console.warn('Supabase init error:',e); }
   return sb;
 }
@@ -11149,7 +11152,7 @@ document.addEventListener('visibilitychange',()=>{
     t._tid = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.style.display = 'none', 300); }, 3000);
   }
 
-  function getSb() { return window.sb || null; }
+  function getSb() { return (typeof sb !== 'undefined' ? sb : null) || window.sb || null; }
 
   // ── HALAMAN REGISTRASI ────────────────────────────────────
   function injectRegisterLink() {
@@ -11288,22 +11291,21 @@ document.addEventListener('visibilitychange',()=>{
 
   async function _loadUsers() {
     const client = (typeof sb !== 'undefined' ? sb : null) || window.sb;
+    if (!client) {
+      const pEl = document.getElementById('_pendingList');
+      if (pEl) pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: Supabase tidak tersedia</div>';
+      return;
+    }
     const pEl = document.getElementById('_pendingList');
     const aEl = document.getElementById('_activeList');
 
-    if (!client) {
-      if (pEl) pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: Supabase tidak tersedia. Coba refresh halaman.</div>';
-      return;
-    }
-
     try {
-      const { data: pending, error: e1 } = await client.from('user_profiles').select('*').eq('role','pending').order('created_at',{ascending:false});
-      const { data: active,  error: e2 } = await client.from('user_profiles').select('*').neq('role','pending').order('created_at',{ascending:false});
+      const [{ data: pending }, { data: active }] = await Promise.all([
+        client.from('user_profiles').select('*').eq('role', 'pending').order('created_at', { ascending: false }),
+        client.from('user_profiles').select('*').neq('role', 'pending').order('created_at', { ascending: false })
+      ]);
 
-      if (e1) throw e1;
-      if (e2) throw e2;
-
-      if (pEl) pEl.innerHTML = (pending && pending.length)
+      pEl.innerHTML = (pending && pending.length)
         ? pending.map(u => `
           <div style="background:var(--sf2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
             <div style="flex:1;min-width:0">
@@ -11315,7 +11317,7 @@ document.addEventListener('visibilitychange',()=>{
           </div>`).join('')
         : '<div style="font-size:12px;color:var(--mt);padding:6px">Tidak ada pendaftaran baru ✓</div>';
 
-      if (aEl) aEl.innerHTML = (active && active.length)
+      aEl.innerHTML = (active && active.length)
         ? active.map(u => `
           <div style="background:var(--sf2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
             <div style="flex:1;min-width:0">
@@ -11332,7 +11334,7 @@ document.addEventListener('visibilitychange',()=>{
         : '<div style="font-size:12px;color:var(--mt);padding:6px">Belum ada user aktif</div>';
 
     } catch (e) {
-      if (pEl) pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: ' + (e.message || JSON.stringify(e)) + '</div>';
+      pEl.innerHTML = '<div style="color:var(--rd);font-size:12px">Error: ' + e.message + '</div>';
     }
   }
 
