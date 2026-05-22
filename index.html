@@ -4541,12 +4541,14 @@ function changeDashLogo(input){
   const file=input.files[0];if(!file)return;
   if(file.size>512000){toast('Ukuran file terlalu besar (maks 512KB)','error');return;}
   const reader=new FileReader();
-  reader.onload=e=>{
+  reader.onload=async e=>{
     const src=e.target.result;
     const img=$('dashLogoImg');if(img)img.src=src;
     try{localStorage.setItem('atw_dash_logo',src);}catch(err){}
     const btn=$('btnResetLogo');if(btn)btn.style.display='flex';
-    // Sync logo ke GSheet _CONFIG jika tersambung
+    // Simpan ke Supabase config (sumber kebenaran, berlaku semua browser/device)
+    await syncDashLogoToSB(src);
+    // Legacy: sync ke GSheet jika masih tersambung
     syncDashLogoToGS(src);
     toast('Logo dashboard diganti ✓');
   };
@@ -4555,12 +4557,25 @@ function changeDashLogo(input){
 function resetDashLogo(){
   if(!confirm('Reset logo ke default ATW Solar?'))return;
   try{localStorage.removeItem('atw_dash_logo');}catch(e){}
-  // Hapus dari GSheet jika tersambung
+  // Hapus dari Supabase config
+  syncDashLogoToSB('');
+  // Legacy: hapus dari GSheet jika tersambung
   syncDashLogoToGS('');
   // Re-load page to restore original embedded logo
   location.reload();
 }
-// Sync logo dashboard ke GSheet _CONFIG
+// ── Simpan logo ke Supabase config table ────────────────────
+async function syncDashLogoToSB(logoSrc){
+  try{
+    const client=_initSb();if(!client)return;
+    const {error}=await client.from('config').upsert(
+      {key:'dash_logo',value:logoSrc||'',updated_at:new Date().toISOString()},
+      {onConflict:'key'}
+    );
+    if(error)console.warn('syncDashLogoToSB error:',error.message);
+  }catch(e){console.warn('syncDashLogoToSB exception:',e);}
+}
+// ── Sync legacy ke GSheet _CONFIG (tetap dipertahankan untuk backward compat) ──
 async function syncDashLogoToGS(logoSrc){
   if(!gsOk||!gsUrl)return;
   try{
@@ -4575,15 +4590,36 @@ async function syncDashLogoToGS(logoSrc){
     });
   }catch(e){}
 }
-// Load custom logo saat startup \u2014 cek localStorage dulu, lalu GSheet
-function loadDashLogo(){
+// ── Load logo saat startup: localStorage (instant) → Supabase (sumber kebenaran) ──
+async function loadDashLogo(){
+  // 1. Tampilkan dari localStorage dulu agar tidak blank saat loading
   try{
-    const saved=localStorage.getItem('atw_dash_logo');
-    if(saved){
-      const img=$('dashLogoImg');if(img)img.src=saved;
+    const cached=localStorage.getItem('atw_dash_logo');
+    if(cached){
+      const img=$('dashLogoImg');if(img)img.src=cached;
       const btn=$('btnResetLogo');if(btn)btn.style.display='flex';
     }
   }catch(e){}
+  // 2. Fetch dari Supabase config — ini sumber kebenaran, berlaku lintas device
+  try{
+    const client=_initSb();if(!client)return;
+    const {data,error}=await client.from('config').select('value').eq('key','dash_logo').maybeSingle();
+    if(error||!data)return;
+    const src=data.value||'';
+    if(src){
+      const img=$('dashLogoImg');if(img)img.src=src;
+      const btn=$('btnResetLogo');if(btn)btn.style.display='flex';
+      // Update cache localStorage agar sinkron
+      try{localStorage.setItem('atw_dash_logo',src);}catch(e){}
+    } else {
+      // Logo dikosongkan dari device lain — ikuti
+      const hasLocal=!!localStorage.getItem('atw_dash_logo');
+      if(hasLocal){
+        try{localStorage.removeItem('atw_dash_logo');}catch(e){}
+        // Tidak reload agar tidak mengganggu; logo default akan tampil setelah reload manual
+      }
+    }
+  }catch(e){console.warn('loadDashLogo from Supabase failed:',e);}
 }
 function logoTag(p,h=36){
   if(!p?.logo)return `<span style="font-size:11px;color:var(--mt)">${p?.client||'\u2014'}</span>`;
