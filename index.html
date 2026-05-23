@@ -10952,16 +10952,15 @@ function initAuth(){
     const saved=localStorage.getItem('atw_dash_logo');
     if(saved){const ai=$('authLogoImg');if(ai)ai.src=saved;}
   }catch(e){}
-  // Load password dari GSheet dulu (async), lalu tampilkan login
-  loadPwFromGS().finally(()=>{
-    if(!checkSession()){
-      const as=$('authScreen');
-      if(as)as.style.cssText='position:fixed;inset:0;background:linear-gradient(135deg,#060a14 0%,#0a0f1e 50%,#0d1525 100%);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column';
-    }else{
-      autoLoadOnStart();loadDashLogo();loadTheme();initFromUrlParams();
-      setTimeout(()=>{loadLogosCache();render();},300);
-    }
-  });
+  // [SUPABASE MIGRATION] Hapus loadPwFromGS — login murni via Supabase Auth
+  // loadPwFromGS tidak diperlukan lagi
+  if(!checkSession()){
+    const as=$('authScreen');
+    if(as)as.style.cssText='position:fixed;inset:0;background:linear-gradient(135deg,#060a14 0%,#0a0f1e 50%,#0d1525 100%);z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column';
+  }else{
+    autoLoadOnStart();loadDashLogo();loadTheme();initFromUrlParams();
+    setTimeout(()=>{loadLogosCache();render();},300);
+  }
 }
 initAuth();
 
@@ -12130,6 +12129,13 @@ document.addEventListener('visibilitychange',()=>{
   }
 
   console.log('✅ Supabase Migration Patch loaded — GSheet sync disabled');
+
+  // ── 15. DISABLE GSHEET PASSWORD LOADING ─────────────────
+  // Login sekarang murni Supabase Auth — tidak perlu fetch password dari GSheet
+  window.loadPwFromGS = async function () {
+    // No-op: skip GSheet request, pakai default values saja
+    return Promise.resolve();
+  };
 
 })();
 </script>
