@@ -12197,6 +12197,402 @@ document.addEventListener('visibilitychange',()=>{
 
   console.log('✅ Supabase Migration Patch loaded — GSheet sync disabled');
 
+  // ── 17. PORTFOLIO OVERVIEW INFOGRAPHICS ──────────────────────
+  // Gauge + Progress Bars + Risk Matrix Bubble Chart
+  (function _oviPatch() {
+    const _charts = {};
+
+    // ── Wait for Chart.js ──
+    function _waitChart(cb, n) {
+      n = n || 0;
+      if (window.Chart) { cb(); return; }
+      if (n > 30) return;
+      setTimeout(function () { _waitChart(cb, n + 1); }, 250);
+    }
+
+    // ── Resolve CSS variable to hex ──
+    function _cssVar(v) {
+      const m = {
+        'var(--gn)': '#10b981', 'var(--bl)': '#3b82f6',
+        'var(--yw)': '#f59e0b', 'var(--rd)': '#ef4444',
+        'var(--pu)': '#8b5cf6', 'var(--or)': '#f97316',
+        'var(--mt)': '#64748b'
+      };
+      return m[v] || v;
+    }
+
+    // ── Inject HTML container ──
+    function _inject() {
+      if (document.getElementById('ov-infographics')) return;
+      const krow = document.querySelector('#tp-overview .krow');
+      if (!krow) return;
+
+      const wrap = document.createElement('div');
+      wrap.id = 'ov-infographics';
+      wrap.innerHTML = [
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">',
+          '<div style="width:24px;height:2px;background:var(--pu)"></div>',
+          '<div style="font-family:var(--fd);font-size:13px;letter-spacing:2px;color:var(--mt)">PORTFOLIO ANALYTICS</div>',
+          '<span id="ovHealthBadge" style="font-size:10px;padding:2px 8px;border-radius:10px;font-family:var(--fm);margin-left:4px"></span>',
+        '</div>',
+        '<div id="ovi-grid" style="display:grid;grid-template-columns:200px 1fr 1fr;gap:10px;align-items:start;margin-bottom:16px">',
+
+          // Panel 1 — Gauge
+          '<div class="card" style="padding:14px 10px;text-align:center">',
+            '<div style="font-size:9px;color:var(--mt);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase">Portfolio Health</div>',
+            '<div style="position:relative;display:inline-block">',
+              '<canvas id="ovGaugeCanvas" width="180" height="106" style="max-width:100%"></canvas>',
+              '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);text-align:center">',
+                '<div id="ovHealthScore" style="font-family:var(--fd);font-size:34px;line-height:1">—</div>',
+                '<div id="ovHealthLabel" style="font-size:9px;margin-top:2px">—</div>',
+              '</div>',
+            '</div>',
+            '<div id="ovHealthBreakdown" style="margin-top:10px;font-size:9px;color:var(--mt);text-align:left;line-height:1.8;padding:0 4px"></div>',
+          '</div>',
+
+          // Panel 2 — Progress bars
+          '<div class="card" style="padding:14px">',
+            '<div style="font-size:9px;color:var(--mt);letter-spacing:1px;margin-bottom:10px;text-transform:uppercase">Progress vs Plan — All Projects</div>',
+            '<div id="ovProgressBars" style="display:flex;flex-direction:column;gap:9px;max-height:210px;overflow-y:auto;padding-right:2px"></div>',
+          '</div>',
+
+          // Panel 3 — Risk matrix
+          '<div class="card" style="padding:14px">',
+            '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">',
+              '<div style="font-size:9px;color:var(--mt);letter-spacing:1px;text-transform:uppercase">Risk Matrix</div>',
+              '<div style="font-size:8px;color:var(--mt)">ukuran = open issues</div>',
+            '</div>',
+            '<canvas id="ovRiskChart" height="195"></canvas>',
+            '<div id="ovRiskLegend" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:8px;color:var(--mt)"></div>',
+          '</div>',
+
+        '</div>'
+      ].join('');
+
+      krow.insertAdjacentElement('afterend', wrap);
+    }
+
+    // ── Calculate composite health score ──
+    function _calcHealth() {
+      var total = (window.P || []).length;
+      if (!total) return { score: 0, label: 'No Data', color: 'var(--mt)', breakdown: {} };
+
+      // Schedule (40 pts)
+      var delayed  = P.filter(function (p) { return p.status === 'Delayed'; }).length;
+      var critical = P.filter(function (p) { return p.status === 'Critical'; }).length;
+      var done     = P.filter(function (p) { return p.status === 'Done'; }).length;
+      var schedScore = Math.max(0, 40 - delayed * 6 - critical * 12 + done * 2);
+      schedScore = Math.min(40, schedScore);
+
+      // SPI accuracy (30 pts)
+      var vl = P.filter(function (p) { return p.plan > 0; });
+      var avgSpi = vl.length > 0
+        ? vl.reduce(function (s, p) { return s + p.actual / p.plan; }, 0) / vl.length
+        : 1;
+      var spiScore = avgSpi >= 1 ? 30 : avgSpi >= 0.9 ? 24 : avgSpi >= 0.75 ? 15 : 6;
+
+      // Issues (20 pts)
+      var openIss = (window.ISS || []).filter(function (i) { return i.status !== 'Closed'; }).length;
+      var issScore = Math.max(0, 20 - Math.min(openIss * 2, 20));
+
+      // Safety (10 pts)
+      var lti = (window.ACCLOGS || []).reduce(function (s, a) { return s + (a.lti || 0); }, 0);
+      var safeScore = Math.max(0, 10 - lti * 5);
+
+      var score = Math.min(100, Math.round(schedScore + spiScore + issScore + safeScore));
+
+      var label, color;
+      if (score >= 80)      { label = '✓ Excellent'; color = 'var(--gn)'; }
+      else if (score >= 60) { label = '◑ Good';      color = 'var(--bl)'; }
+      else if (score >= 40) { label = '⚠ Fair';      color = 'var(--yw)'; }
+      else                  { label = '✗ Poor';       color = 'var(--rd)'; }
+
+      return {
+        score: score, label: label, color: color,
+        breakdown: {
+          'Schedule': schedScore + '/40',
+          'SPI Accuracy': spiScore + '/30',
+          'Issues': issScore + '/20',
+          'Safety': safeScore + '/10'
+        }
+      };
+    }
+
+    // ── Draw gauge on canvas ──
+    function _drawGauge(score, colorVar) {
+      var canvas = document.getElementById('ovGaugeCanvas');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+      var W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      var cx = W / 2, cy = H * 0.92;
+      var r  = W * 0.38;
+      var startA = Math.PI, endA = 2 * Math.PI;
+      var isLight = document.documentElement.classList.contains('light');
+      var trackClr = isLight ? '#d0dbe8' : '#1e2d45';
+      var fillClr  = _cssVar(colorVar);
+
+      // Gradient zones (background arc segments)
+      var zones = [
+        ['#ef444440', 0, 0.25],
+        ['#f59e0b40', 0.25, 0.5],
+        ['#3b82f640', 0.5, 0.75],
+        ['#10b98140', 0.75, 1]
+      ];
+      zones.forEach(function (z) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, startA + z[1] * Math.PI, startA + z[2] * Math.PI);
+        ctx.lineWidth = 12;
+        ctx.strokeStyle = z[0];
+        ctx.lineCap = 'butt';
+        ctx.stroke();
+      });
+
+      // Track
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, startA, endA);
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = 'transparent';
+      ctx.stroke();
+
+      // Value fill
+      var fillEnd = startA + (score / 100) * Math.PI;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, startA, fillEnd);
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = fillClr;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Needle
+      var needleA = startA + (score / 100) * Math.PI;
+      var nx = cx + (r - 16) * Math.cos(needleA);
+      var ny = cy + (r - 16) * Math.sin(needleA);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(nx, ny);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = fillClr;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Center dot
+      ctx.beginPath();
+      ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = fillClr;
+      ctx.fill();
+
+      // Labels: 0, 25, 50, 75, 100
+      ctx.font = '8px monospace';
+      ctx.fillStyle = isLight ? '#94a3b8' : '#475569';
+      ctx.textAlign = 'center';
+      [0, 25, 50, 75, 100].forEach(function (v) {
+        var a = startA + (v / 100) * Math.PI;
+        var lx = cx + (r + 10) * Math.cos(a);
+        var ly = cy + (r + 10) * Math.sin(a);
+        ctx.fillText(v, lx, ly);
+      });
+    }
+
+    // ── Render progress bars ──
+    function _renderBars() {
+      var el = document.getElementById('ovProgressBars');
+      if (!el) return;
+      var pp = window.P || [];
+      if (!pp.length) {
+        el.innerHTML = '<div style="color:var(--mt);font-size:11px;text-align:center;padding:16px">Belum ada project</div>';
+        return;
+      }
+      var sc = { 'On Track': 'var(--gn)', 'Delayed': 'var(--yw)', 'Critical': 'var(--rd)', 'Planning': 'var(--bl)', 'Done': 'var(--pu)' };
+      el.innerHTML = pp.map(function (p) {
+        var v   = (p.actual || 0) - (p.plan || 0);
+        var vc  = v >= 0 ? 'var(--gn)' : 'var(--rd)';
+        var clr = sc[p.status] || 'var(--mt)';
+        var act = Math.min(p.actual || 0, 100);
+        var pln = Math.min(p.plan || 0, 100);
+        return [
+          '<div>',
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">',
+              '<div style="font-size:10px;color:var(--tx);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">',
+                '<span style="font-family:var(--fm);color:', clr, ';margin-right:4px">', (p.kode || ''), '</span>',
+                '<span style="color:var(--mt)">', p.nama, '</span>',
+              '</div>',
+              '<div style="font-size:9px;font-family:var(--fm);color:', vc, '">', (v >= 0 ? '+' : ''), v, '%</div>',
+            '</div>',
+            '<div style="height:7px;background:var(--bd);border-radius:4px;position:relative;overflow:hidden">',
+              '<div style="position:absolute;left:0;top:0;height:100%;width:', pln, '%;background:rgba(59,130,246,.25);border-radius:4px"></div>',
+              '<div style="position:absolute;left:0;top:0;height:100%;width:', act, '%;background:', clr, ';border-radius:4px;transition:width .5s ease"></div>',
+            '</div>',
+            '<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--mt);margin-top:2px">',
+              '<span>Plan: ', (p.plan || 0), '%</span>',
+              '<span>Actual: <span style="color:', clr, '">', (p.actual || 0), '%</span></span>',
+            '</div>',
+          '</div>'
+        ].join('');
+      }).join('');
+    }
+
+    // ── Render Risk Matrix (Bubble Chart) ──
+    function _renderRisk() {
+      _waitChart(function () {
+        var canvas = document.getElementById('ovRiskChart');
+        if (!canvas) return;
+
+        if (_charts.risk) { try { _charts.risk.destroy(); } catch (e) {} _charts.risk = null; }
+
+        var pp = window.P || [];
+        if (!pp.length) return;
+
+        var today  = new Date();
+        var isLight = document.documentElement.classList.contains('light');
+        var textClr = isLight ? '#64748b' : '#94a3b8';
+        var gridClr = isLight ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.05)';
+
+        var statusClrs = {
+          'On Track': '#10b981', 'Delayed': '#f59e0b',
+          'Critical': '#ef4444', 'Planning': '#3b82f6', 'Done': '#8b5cf6'
+        };
+
+        var datasets = pp.map(function (p) {
+          var iss = (window.ISS || []).filter(function (i) {
+            return i.projId === p.id && i.status !== 'Closed';
+          }).length;
+          var days = p.selesai
+            ? Math.round((new Date(p.selesai) - today) / 86400000)
+            : null;
+          var clr = statusClrs[p.status] || '#64748b';
+          return {
+            label: (p.kode || p.nama.slice(0, 8)),
+            data: [{
+              x: p.actual || 0,
+              y: days !== null ? days : 999,
+              r: Math.max(5, Math.min(22, 6 + iss * 3.5))
+            }],
+            backgroundColor: clr + 'aa',
+            borderColor: clr,
+            borderWidth: 1.5,
+            _projId: p.id
+          };
+        });
+
+        // Legend
+        var legEl = document.getElementById('ovRiskLegend');
+        if (legEl) {
+          legEl.innerHTML = Object.keys(statusClrs).map(function (k) {
+            var cnt = pp.filter(function (p) { return p.status === k; }).length;
+            if (!cnt) return '';
+            return '<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:' + statusClrs[k] + ';display:inline-block"></span>' + k + ' (' + cnt + ')</span>';
+          }).join('');
+        }
+
+        _charts.risk = new Chart(canvas, {
+          type: 'bubble',
+          data: { datasets: datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title: function (items) {
+                    var ds = items[0].dataset;
+                    var proj = pp.find(function (p) { return p.id === ds._projId; });
+                    return proj ? proj.nama : ds.label;
+                  },
+                  label: function (ctx) {
+                    var ds  = ctx.dataset;
+                    var proj = pp.find(function (p) { return p.id === ds._projId; });
+                    var iss  = (window.ISS || []).filter(function (i) { return i.projId === ds._projId && i.status !== 'Closed'; }).length;
+                    return [
+                      'Status: ' + (proj ? proj.status : '—'),
+                      'Progress: ' + ctx.raw.x + '%',
+                      'Sisa: ' + (ctx.raw.y === 999 ? 'N/A' : ctx.raw.y + ' hari'),
+                      'Open Issues: ' + iss
+                    ];
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'Progress Actual (%)', color: textClr, font: { size: 9 } },
+                min: 0, max: 100,
+                ticks: { color: textClr, font: { size: 9 }, stepSize: 25 },
+                grid: { color: gridClr }
+              },
+              y: {
+                title: { display: true, text: 'Sisa Hari', color: textClr, font: { size: 9 } },
+                ticks: { color: textClr, font: { size: 9 } },
+                grid: { color: gridClr }
+              }
+            }
+          }
+        });
+      });
+    }
+
+    // ── Master render ──
+    function renderOVInfographics() {
+      _inject();
+
+      var h  = _calcHealth();
+      var sc = document.getElementById('ovHealthScore');
+      var sl = document.getElementById('ovHealthLabel');
+      var sb = document.getElementById('ovHealthBadge');
+      var bd = document.getElementById('ovHealthBreakdown');
+
+      if (sc) { sc.textContent = h.score; sc.style.color = _cssVar(h.color); }
+      if (sl) { sl.textContent = h.label; sl.style.color = _cssVar(h.color); }
+      if (sb) {
+        sb.textContent = h.score + '/100';
+        sb.style.background = _cssVar(h.color) + '22';
+        sb.style.color = _cssVar(h.color);
+        sb.style.border = '1px solid ' + _cssVar(h.color) + '55';
+      }
+      if (bd) {
+        bd.innerHTML = Object.entries(h.breakdown).map(function (kv) {
+          return '<div style="display:flex;justify-content:space-between"><span>' + kv[0] + '</span><span style="font-family:var(--fm)">' + kv[1] + '</span></div>';
+        }).join('');
+      }
+
+      _drawGauge(h.score, h.color);
+      _renderBars();
+      _renderRisk();
+    }
+
+    // ── Patch renderOV ──
+    var _origRenderOV = window.renderOV;
+    window.renderOV = function () {
+      if (_origRenderOV) _origRenderOV.apply(this, arguments);
+      try { renderOVInfographics(); } catch (e) { console.warn('[OVI]', e); }
+    };
+
+    // Re-draw gauge on theme toggle (light/dark)
+    var _origToggleTheme = window.toggleTheme;
+    window.toggleTheme = function () {
+      if (_origToggleTheme) _origToggleTheme.apply(this, arguments);
+      setTimeout(function () {
+        try { renderOVInfographics(); } catch (e) {}
+      }, 100);
+    };
+
+    // Responsive: redraw on resize
+    var _rszTimer;
+    window.addEventListener('resize', function () {
+      clearTimeout(_rszTimer);
+      _rszTimer = setTimeout(function () {
+        if (document.getElementById('ovGaugeCanvas')) {
+          try { renderOVInfographics(); } catch (e) {}
+        }
+      }, 300);
+    });
+
+    window.renderOVInfographics = renderOVInfographics;
+    console.log('✅ Portfolio Infographic Patch loaded');
+  })();
+
   // ── 16. FIX VIEWER MODE WBS — nama & bobot tersembunyi ──────
   // Masalah: nama subcat/item dibungkus .wbs-inline-text.edit-only
   // yang disembunyikan CSS untuk viewer-mode.
