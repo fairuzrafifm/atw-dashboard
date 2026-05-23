@@ -2997,9 +2997,11 @@ function mapRab(r) {
 function unmapRab(r) {
   return {
     id: r.id, proj_id: r.projId, type: r.type, kat_id: r.katId || null,
-    name: r.name, deskripsi: r.deskripsi, satuan: r.satuan,
+    // Items (type='item') tidak punya field 'name' di JS — fallback ke deskripsi
+    name: (r.name || r.deskripsi || '').slice(0,200),
+    deskripsi: r.deskripsi || '', satuan: r.satuan || '',
     volume: r.volume || 0, harga_satuan: r.hargaSatuan || 0,
-    notes: r.notes, urutan: r.urutan || 1, is_custom: r.isCustom !== false
+    notes: r.notes || '', urutan: r.urutan || 1, is_custom: r.isCustom !== false
   };
 }
 
@@ -3015,7 +3017,9 @@ function mapWbs(r) {
 function unmapWbs(w) {
   return {
     id: w.id, proj_id: w.projId, type: w.type,
-    parent_id: w.parentId || null, name: w.name, bobot: w.bobot || 0,
+    parent_id: w.parentId || null,
+    name: (w.name || '(unnamed)').slice(0, 200),  // NOT NULL guard
+    bobot: w.bobot || 0,
     order: w.order || 0, cum_plan: w.cumPlan || 0, cum_actual: w.cumActual || 0,
     start_date: w.startDate || null, finish_date: w.finishDate || null,
     weekly_data: w.weeklyData || {}, weekly_plan: w.weeklyPlan || {}
@@ -11652,11 +11656,24 @@ document.addEventListener('visibilitychange',()=>{
           break;
 
         case 'wbs_bulk':
-          // data = array of WBS nodes
-          if (action === 'save')
-            await Promise.all(data.map(n => sbSaveWbs(n)));
-          else if (action === 'delete')
-            await Promise.all(data.map(n => client.from('wbs').delete().eq('id', n.id)));
+          // Upsert batch — sort cat→subcat→item agar FK parent_id tidak gagal
+          if (action === 'save' && data.length) {
+            const typeOrder = { cat: 0, subcat: 1, item: 2 };
+            const sorted = [...data].sort((a, b) =>
+              (typeOrder[a.type] ?? 1) - (typeOrder[b.type] ?? 1));
+            const mapped = sorted.map(n => unmapWbs(n));
+            const { error } = await client.from('wbs')
+              .upsert(mapped, { onConflict: 'id' });
+            if (error) throw error;
+          } else if (action === 'delete' && data.length) {
+            // Hapus berurutan item→subcat→cat (reverse FK order)
+            const typeOrder = { cat: 2, subcat: 1, item: 0 };
+            const sorted = [...data].sort((a, b) =>
+              (typeOrder[a.type] ?? 0) - (typeOrder[b.type] ?? 0));
+            for (const n of sorted) {
+              await client.from('wbs').delete().eq('id', n.id);
+            }
+          }
           break;
 
         case 'scurve':
@@ -11887,51 +11904,43 @@ document.addEventListener('visibilitychange',()=>{
   // ── 11. RAB ──────────────────────────────────────────────
   const _orig_saveRabKat = window.saveRabKat;
   window.saveRabKat = async function () {
+    const prevId = typeof editRabCatId !== 'undefined' ? editRabCatId : null;
     _orig_saveRabKat.call(this);
-    const item = RAB[RAB.length - 1];
+    const item = prevId ? RAB.find(x => String(x.id) === String(prevId))
+                        : RAB[RAB.length - 1];
     if (item) await _sbPersist('rab', 'save', item);
   };
 
-  window.delRabKat = function () {
-    const id = document.getElementById('rabKatId')?.value ||
-               (typeof editRabKatId !== 'undefined' ? editRabKatId : null);
-    if (typeof showConfirm === 'function') {
-      showConfirm('Hapus kategori & semua isinya?', async () => {
-        const toRm = new Set();
-        toRm.add(String(id));
-        (typeof RAB !== 'undefined' ? RAB : [])
-          .filter(r => String(r.katId) === String(id) || String(r.id) === String(id))
-          .forEach(r => toRm.add(String(r.id)));
-        window.RAB = RAB.filter(r => !toRm.has(String(r.id)));
-        if (typeof dirty === 'function') dirty();
-        if (typeof cm === 'function') cm('addRabKat');
-        if (typeof renderRab === 'function') renderRab();
-        if (typeof toast === 'function') toast('Kategori dihapus', 'warn');
-        await Promise.all([...toRm].map(rid => _sbPersist('rab', 'delete', { id: rid })));
-      });
+  // delRabKat: pakai original (confirm() di dalamnya), capture ids sebelum
+  const _orig_delRabKat = window.delRabKat;
+  window.delRabKat = async function () {
+    const catId = typeof editRabCatId !== 'undefined' ? editRabCatId : null;
+    const childIds = catId ? RAB.filter(r => r.type === 'item' && String(r.katId) === String(catId)).map(r => r.id) : [];
+    _orig_delRabKat.call(this); // confirm() synchronous di dalam
+    // Cek apakah benar-benar dihapus dari memory
+    const deleted = catId && !RAB.find(r => String(r.id) === String(catId));
+    if (deleted) {
+      await _sbPersist('rab', 'delete', { id: catId });
+      for (const id of childIds) await _sbPersist('rab', 'delete', { id });
     }
   };
 
   const _orig_saveRabItem = window.saveRabItem;
   window.saveRabItem = async function () {
+    const prevId = typeof editRabId !== 'undefined' ? editRabId : null;
     _orig_saveRabItem.call(this);
-    const item = RAB[RAB.length - 1];
+    const item = prevId ? RAB.find(x => String(x.id) === String(prevId))
+                        : RAB[RAB.length - 1];
     if (item) await _sbPersist('rab', 'save', item);
   };
 
-  window.delRabItem = function () {
-    const id = document.getElementById('rabItemId')?.value ||
-               (typeof editRabItemId !== 'undefined' ? editRabItemId : null);
-    if (typeof showConfirm === 'function') {
-      showConfirm('Hapus item RAB ini?', async () => {
-        window.RAB = RAB.filter(r => String(r.id) !== String(id));
-        if (typeof dirty === 'function') dirty();
-        if (typeof cm === 'function') cm('addRabItem');
-        if (typeof renderRab === 'function') renderRab();
-        if (typeof toast === 'function') toast('Item RAB dihapus', 'warn');
-        if (id) await _sbPersist('rab', 'delete', { id });
-      });
-    }
+  // delRabItem: pakai original (confirm() di dalamnya)
+  const _orig_delRabItem = window.delRabItem;
+  window.delRabItem = async function () {
+    const id = typeof editRabId !== 'undefined' ? editRabId : null;
+    _orig_delRabItem.call(this); // confirm() di dalam
+    const deleted = id && !RAB.find(r => String(r.id) === String(id));
+    if (deleted) await _sbPersist('rab', 'delete', { id });
   };
 
   const _orig_executeCloneRab = window.executeCloneRab;
