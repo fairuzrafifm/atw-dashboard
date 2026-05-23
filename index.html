@@ -12197,6 +12197,37 @@ document.addEventListener('visibilitychange',()=>{
 
   console.log('✅ Supabase Migration Patch loaded — GSheet sync disabled');
 
+  // ── 16. FIX VIEWER MODE WBS — nama & bobot tersembunyi ──────
+  // Masalah: nama subcat/item dibungkus .wbs-inline-text.edit-only
+  // yang disembunyikan CSS untuk viewer-mode.
+  // Fix: tampilkan sebagai read-only text (input tidak interaktif)
+  const _viewerWbsCss = document.createElement('style');
+  _viewerWbsCss.textContent = `
+    body.viewer-mode .wbs-inline-text.edit-only {
+      display: inline-flex !important;
+      pointer-events: none !important;
+      cursor: default !important;
+    }
+    body.viewer-mode .wbs-inline-text.edit-only input {
+      pointer-events: none !important;
+      background: transparent !important;
+      border: none !important;
+      outline: none !important;
+      cursor: text;
+      color: inherit;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    body.viewer-mode .wbs-date-cell.edit-only {
+      display: table-cell !important;
+      pointer-events: none !important;
+    }
+    body.viewer-mode .wbs-date-cell.edit-only input[type="date"] {
+      display: none !important;
+    }
+  `;
+  document.head.appendChild(_viewerWbsCss);
+
   // ── 15. DISABLE GSHEET PASSWORD LOADING ─────────────────
   // Login sekarang murni Supabase Auth — tidak perlu fetch password dari GSheet
   window.loadPwFromGS = async function () {
