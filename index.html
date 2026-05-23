@@ -11699,6 +11699,27 @@ document.addEventListener('visibilitychange',()=>{
   }
   window._sbPersist = _sbPersist;
 
+  // ── ATOMIC PATCH HELPER ──────────────────────────────────
+  // Kirim HANYA field tertentu — bukan seluruh objek
+  // Ini mencegah User A menimpa perubahan User B di field berbeda
+  async function _sbAtomicPatch(table, id, fields) {
+    if (!id) return;
+    const client = _initSb(); if (!client) return;
+    const payload = { ...fields, updated_at: new Date().toISOString() };
+    const { error } = await client.from(table).update(payload).eq('id', id);
+    if (error) throw error;
+  }
+  window._sbAtomicPatch = _sbAtomicPatch;
+
+  // ── ATOMIC INSERT HELPER ─────────────────────────────────
+  // Untuk record BARU — pakai insert, bukan upsert
+  async function _sbAtomicInsert(table, obj) {
+    const client = _initSb(); if (!client) return;
+    const { error } = await client.from(table).insert(obj);
+    if (error) throw error;
+  }
+  window._sbAtomicInsert = _sbAtomicInsert;
+
   // ── 4. OVERRIDE autoLoadOnStart → Supabase ───────────────
   window.autoLoadOnStart = async function () {
     // Tampilkan cache lokal dulu (instant)
@@ -11729,13 +11750,34 @@ document.addEventListener('visibilitychange',()=>{
     }
   };
 
-  // ── 5. PROJECT ──────────────────────────────────────────
+  // ── 5. PROJECT — Atomic PATCH per domain ────────────────
+  // saveProj: PATCH hanya field form (metadata)
+  // Tidak menyentuh plan/actual/status — itu domain S-Curve & saveUpdate
   const _orig_saveProj = window.saveProj;
   window.saveProj = async function () {
     const prevId = typeof editProjId !== 'undefined' ? editProjId : null;
     _orig_saveProj.call(this);
     const proj = prevId ? P.find(p => p.id === prevId) : P[P.length - 1];
-    if (proj) await _sbPersist('project', 'save', proj);
+    if (!proj) return;
+    try {
+      if (prevId) {
+        // UPDATE existing — PATCH metadata fields only
+        await _sbAtomicPatch('projects', prevId, {
+          kode: proj.kode, nama: proj.nama,
+          lokasi: proj.lokasi || null, client: proj.client || null,
+          mulai: proj.mulai || null, selesai: proj.selesai || null,
+          mp_plan: proj.mpPlan || 0, mh_plan: proj.mhPlan || 0,
+          notes: proj.notes || null, logo: proj.logo || null,
+          weather: proj.weather || null,
+          pic_pm: proj.picPm || null, pic_sm: proj.picSm || null,
+          pic_eng: proj.picEng || null, pic_proc: proj.picProc || null
+        });
+      } else {
+        // INSERT new project — full upsert (record belum ada di DB)
+        await sbSaveProject(proj);
+      }
+      _sbStatusOk();
+    } catch(e) { _sbStatusErr(e.message); console.warn('[saveProj patch]', e); }
   };
 
   const _orig_doDelProj = window._doDelProj;
@@ -11752,37 +11794,57 @@ document.addEventListener('visibilitychange',()=>{
     _orig_executeCloneProject.call(this);
     const newProj = P[P.length - 1];
     if (newProj && P.length > prevLen) {
-      await _sbPersist('project', 'save', newProj);
+      await sbSaveProject(newProj);
       const newWbs = WBS.slice(prevWbsLen);
       if (newWbs.length) await _sbPersist('wbs_bulk', 'save', newWbs);
     }
   };
 
+  // saveUpdate: PATCH hanya plan/actual/status/notes — domain progress
   const _orig_saveUpdate = window.saveUpdate;
   window.saveUpdate = async function () {
     _orig_saveUpdate.call(this);
-    const p = (typeof selId !== 'undefined') ? P.find(x => x.id === selId) : null;
-    if (p) {
-      await _sbPersist('project', 'save', p);
+    const p = P.find(x => x.id === selId);
+    if (!p) return;
+    try {
+      await _sbAtomicPatch('projects', p.id, {
+        plan: p.plan, actual: p.actual,
+        mp_actual: p.mpActual || 0, status: p.status,
+        notes: p.notes || null
+      });
       if (p.history?.length) await _sbPersist('history', 'save', { projId: p.id, history: p.history });
-    }
+      _sbStatusOk();
+    } catch(e) { _sbStatusErr(e.message); }
   };
 
+  // saveWeather: PATCH hanya field weather
   const _orig_saveWeather = window.saveWeather;
   window.saveWeather = async function () {
     _orig_saveWeather.call(this);
-    await Promise.all(P.map(p => _sbPersist('project', 'save', p)));
+    try {
+      await Promise.all(P.map(p =>
+        _sbAtomicPatch('projects', p.id, { weather: p.weather || null })
+      ));
+      _sbStatusOk();
+    } catch(e) { _sbStatusErr(e.message); }
   };
 
   // History edit/delete
   const _orig_saveHistEntry = window.saveHistEntry;
   window.saveHistEntry = async function () {
     const projId = document.getElementById('ehProjId')?.value;
+    const idx     = +document.getElementById('ehIdx')?.value;
     _orig_saveHistEntry.call(this);
     const p = projId ? P.find(x => String(x.id) === String(projId)) : null;
     if (p) {
       await _sbPersist('history', 'save', { projId: p.id, history: p.history });
-      await _sbPersist('project', 'save', p);
+      // Jika entri terakhir, sync plan/actual ke project
+      if (idx === (p.history?.length ?? 0) - 1) {
+        await _sbAtomicPatch('projects', p.id, {
+          plan: p.plan, actual: p.actual, status: p.status
+        });
+      }
+      _sbStatusOk();
     }
   };
 
@@ -11792,6 +11854,7 @@ document.addEventListener('visibilitychange',()=>{
     const p = P.find(x => x.id === projId);
     if (p) await _sbPersist('history', 'save', { projId: p.id, history: p.history });
   };
+
 
   // ── 6. MANPOWER ──────────────────────────────────────────
   const _orig_saveMp = window.saveMp;
@@ -12077,7 +12140,7 @@ document.addEventListener('visibilitychange',()=>{
     };
   }
 
-  // ── 13. S-CURVE ──────────────────────────────────────────
+  // ── 13. S-CURVE — atomic PATCH plan/actual ke project ───
   const _orig_doSaveSCurveActual = window._doSaveSCurveActual;
   window._doSaveSCurveActual = async function (projId, week, wAct, cAct) {
     _orig_doSaveSCurveActual.call(this, projId, week, wAct, cAct);
@@ -12085,44 +12148,48 @@ document.addEventListener('visibilitychange',()=>{
     if (entry) await _sbPersist('scurve', 'save', entry);
     const proj = P.find(p => String(p.id) === String(projId));
     if (proj) {
-      await _sbPersist('project', 'save', proj);
-      if (proj.history?.length) await _sbPersist('history', 'save', { projId: proj.id, history: proj.history });
+      // PATCH hanya plan/actual/status — tidak timpa metadata
+      await _sbAtomicPatch('projects', proj.id, {
+        plan: proj.plan, actual: proj.actual, status: proj.status
+      });
+      if (proj.history?.length)
+        await _sbPersist('history', 'save', { projId: proj.id, history: proj.history });
+      _sbStatusOk();
     }
   };
 
-  // S-curve plan save (the function ending at line 7599)
-  const _orig_doSaveSCurvePlan = window._doSaveSCurvePlan;
-  if (_orig_doSaveSCurvePlan) {
-    window._doSaveSCurvePlan = async function (...args) {
-      _orig_doSaveSCurvePlan.apply(this, args);
-    };
-  }
-
-  // delScWeek
-  const _orig_doDelScWeek = window._doDelScWeek;
   window._doDelScWeek = async function (projId, week) {
-    _orig_doDelScWeek.call(this, projId, week);
+    const _orig = window.__origDoDelScWeek;
+    if (_orig) _orig.call(this, projId, week);
+    else {
+      SCURVE = SCURVE.filter(d => !(String(d.projId) === String(projId) && d.week === week));
+      if (typeof dirty === 'function') dirty();
+      if (typeof renderSCurve === 'function') renderSCurve();
+      if (typeof renderScManageTable === 'function') renderScManageTable();
+      if (typeof toast === 'function') toast('Data dihapus', 'warn');
+    }
     await _sbPersist('scurve', 'delete', { projId, week });
   };
+  // Simpan referensi original sebelum override hilang
+  if (!window.__origDoDelScWeek && window._doDelScWeek_orig_backup)
+    window.__origDoDelScWeek = window._doDelScWeek_orig_backup;
 
-  // ── 14. PATCH SAVE SCURVE PLAN (line ~7600) ──────────────
-  // Function di baris 7597-7600 tidak punya nama window-level yang bisa di-override mudah.
-  // Kita override dengan mengecek context ketika gsSync dipanggil — sudah di-no-op.
-  // Fallback: save semua SCURVE untuk projId tersebut setelah scPlan modal ditutup.
-  const _origCmFn = window.cm;
-  if (_origCmFn) {
+  const _orig_cm_scPlan = window.cm;
+  if (_orig_cm_scPlan) {
     window.cm = function (modalName) {
-      _origCmFn.call(this, modalName);
-      // Setelah tutup modal scPlan, sync S-Curve + project ke Supabase
+      _orig_cm_scPlan.call(this, modalName);
       if (modalName === 'scPlan') {
         setTimeout(async () => {
-          const projSel = document.getElementById('scPlanProj');
-          const projId = projSel?.value || selId;
+          const projId = document.getElementById('scPlanProj')?.value || selId;
           if (!projId) return;
           const entries = SCURVE.filter(s => String(s.projId) === String(projId));
           await Promise.all(entries.map(e => _sbPersist('scurve', 'save', e)));
           const proj = P.find(p => String(p.id) === String(projId));
-          if (proj) await _sbPersist('project', 'save', proj);
+          if (proj) {
+            await _sbAtomicPatch('projects', proj.id, {
+              plan: proj.plan, actual: proj.actual
+            });
+          }
         }, 300);
       }
     };
