@@ -12197,402 +12197,6 @@ document.addEventListener('visibilitychange',()=>{
 
   console.log('✅ Supabase Migration Patch loaded — GSheet sync disabled');
 
-  // ── 17. PORTFOLIO OVERVIEW INFOGRAPHICS ──────────────────────
-  // Gauge + Progress Bars + Risk Matrix Bubble Chart
-  (function _oviPatch() {
-    const _charts = {};
-
-    // ── Wait for Chart.js ──
-    function _waitChart(cb, n) {
-      n = n || 0;
-      if (window.Chart) { cb(); return; }
-      if (n > 30) return;
-      setTimeout(function () { _waitChart(cb, n + 1); }, 250);
-    }
-
-    // ── Resolve CSS variable to hex ──
-    function _cssVar(v) {
-      const m = {
-        'var(--gn)': '#10b981', 'var(--bl)': '#3b82f6',
-        'var(--yw)': '#f59e0b', 'var(--rd)': '#ef4444',
-        'var(--pu)': '#8b5cf6', 'var(--or)': '#f97316',
-        'var(--mt)': '#64748b'
-      };
-      return m[v] || v;
-    }
-
-    // ── Inject HTML container ──
-    function _inject() {
-      if (document.getElementById('ov-infographics')) return;
-      const krow = document.querySelector('#tp-overview .krow');
-      if (!krow) return;
-
-      const wrap = document.createElement('div');
-      wrap.id = 'ov-infographics';
-      wrap.innerHTML = [
-        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">',
-          '<div style="width:24px;height:2px;background:var(--pu)"></div>',
-          '<div style="font-family:var(--fd);font-size:13px;letter-spacing:2px;color:var(--mt)">PORTFOLIO ANALYTICS</div>',
-          '<span id="ovHealthBadge" style="font-size:10px;padding:2px 8px;border-radius:10px;font-family:var(--fm);margin-left:4px"></span>',
-        '</div>',
-        '<div id="ovi-grid" style="display:grid;grid-template-columns:200px 1fr 1fr;gap:10px;align-items:start;margin-bottom:16px">',
-
-          // Panel 1 — Gauge
-          '<div class="card" style="padding:14px 10px;text-align:center">',
-            '<div style="font-size:9px;color:var(--mt);letter-spacing:1px;margin-bottom:6px;text-transform:uppercase">Portfolio Health</div>',
-            '<div style="position:relative;display:inline-block">',
-              '<canvas id="ovGaugeCanvas" width="180" height="106" style="max-width:100%"></canvas>',
-              '<div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);text-align:center">',
-                '<div id="ovHealthScore" style="font-family:var(--fd);font-size:34px;line-height:1">—</div>',
-                '<div id="ovHealthLabel" style="font-size:9px;margin-top:2px">—</div>',
-              '</div>',
-            '</div>',
-            '<div id="ovHealthBreakdown" style="margin-top:10px;font-size:9px;color:var(--mt);text-align:left;line-height:1.8;padding:0 4px"></div>',
-          '</div>',
-
-          // Panel 2 — Progress bars
-          '<div class="card" style="padding:14px">',
-            '<div style="font-size:9px;color:var(--mt);letter-spacing:1px;margin-bottom:10px;text-transform:uppercase">Progress vs Plan — All Projects</div>',
-            '<div id="ovProgressBars" style="display:flex;flex-direction:column;gap:9px;max-height:210px;overflow-y:auto;padding-right:2px"></div>',
-          '</div>',
-
-          // Panel 3 — Risk matrix
-          '<div class="card" style="padding:14px">',
-            '<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">',
-              '<div style="font-size:9px;color:var(--mt);letter-spacing:1px;text-transform:uppercase">Risk Matrix</div>',
-              '<div style="font-size:8px;color:var(--mt)">ukuran = open issues</div>',
-            '</div>',
-            '<canvas id="ovRiskChart" height="195"></canvas>',
-            '<div id="ovRiskLegend" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:8px;color:var(--mt)"></div>',
-          '</div>',
-
-        '</div>'
-      ].join('');
-
-      krow.insertAdjacentElement('afterend', wrap);
-    }
-
-    // ── Calculate composite health score ──
-    function _calcHealth() {
-      var total = (window.P || []).length;
-      if (!total) return { score: 0, label: 'No Data', color: 'var(--mt)', breakdown: {} };
-
-      // Schedule (40 pts)
-      var delayed  = P.filter(function (p) { return p.status === 'Delayed'; }).length;
-      var critical = P.filter(function (p) { return p.status === 'Critical'; }).length;
-      var done     = P.filter(function (p) { return p.status === 'Done'; }).length;
-      var schedScore = Math.max(0, 40 - delayed * 6 - critical * 12 + done * 2);
-      schedScore = Math.min(40, schedScore);
-
-      // SPI accuracy (30 pts)
-      var vl = P.filter(function (p) { return p.plan > 0; });
-      var avgSpi = vl.length > 0
-        ? vl.reduce(function (s, p) { return s + p.actual / p.plan; }, 0) / vl.length
-        : 1;
-      var spiScore = avgSpi >= 1 ? 30 : avgSpi >= 0.9 ? 24 : avgSpi >= 0.75 ? 15 : 6;
-
-      // Issues (20 pts)
-      var openIss = (window.ISS || []).filter(function (i) { return i.status !== 'Closed'; }).length;
-      var issScore = Math.max(0, 20 - Math.min(openIss * 2, 20));
-
-      // Safety (10 pts)
-      var lti = (window.ACCLOGS || []).reduce(function (s, a) { return s + (a.lti || 0); }, 0);
-      var safeScore = Math.max(0, 10 - lti * 5);
-
-      var score = Math.min(100, Math.round(schedScore + spiScore + issScore + safeScore));
-
-      var label, color;
-      if (score >= 80)      { label = '✓ Excellent'; color = 'var(--gn)'; }
-      else if (score >= 60) { label = '◑ Good';      color = 'var(--bl)'; }
-      else if (score >= 40) { label = '⚠ Fair';      color = 'var(--yw)'; }
-      else                  { label = '✗ Poor';       color = 'var(--rd)'; }
-
-      return {
-        score: score, label: label, color: color,
-        breakdown: {
-          'Schedule': schedScore + '/40',
-          'SPI Accuracy': spiScore + '/30',
-          'Issues': issScore + '/20',
-          'Safety': safeScore + '/10'
-        }
-      };
-    }
-
-    // ── Draw gauge on canvas ──
-    function _drawGauge(score, colorVar) {
-      var canvas = document.getElementById('ovGaugeCanvas');
-      if (!canvas) return;
-      var ctx = canvas.getContext('2d');
-      var W = canvas.width, H = canvas.height;
-      ctx.clearRect(0, 0, W, H);
-
-      var cx = W / 2, cy = H * 0.92;
-      var r  = W * 0.38;
-      var startA = Math.PI, endA = 2 * Math.PI;
-      var isLight = document.documentElement.classList.contains('light');
-      var trackClr = isLight ? '#d0dbe8' : '#1e2d45';
-      var fillClr  = _cssVar(colorVar);
-
-      // Gradient zones (background arc segments)
-      var zones = [
-        ['#ef444440', 0, 0.25],
-        ['#f59e0b40', 0.25, 0.5],
-        ['#3b82f640', 0.5, 0.75],
-        ['#10b98140', 0.75, 1]
-      ];
-      zones.forEach(function (z) {
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, startA + z[1] * Math.PI, startA + z[2] * Math.PI);
-        ctx.lineWidth = 12;
-        ctx.strokeStyle = z[0];
-        ctx.lineCap = 'butt';
-        ctx.stroke();
-      });
-
-      // Track
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, startA, endA);
-      ctx.lineWidth = 12;
-      ctx.strokeStyle = 'transparent';
-      ctx.stroke();
-
-      // Value fill
-      var fillEnd = startA + (score / 100) * Math.PI;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, startA, fillEnd);
-      ctx.lineWidth = 12;
-      ctx.strokeStyle = fillClr;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-
-      // Needle
-      var needleA = startA + (score / 100) * Math.PI;
-      var nx = cx + (r - 16) * Math.cos(needleA);
-      var ny = cy + (r - 16) * Math.sin(needleA);
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(nx, ny);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = fillClr;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-
-      // Center dot
-      ctx.beginPath();
-      ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
-      ctx.fillStyle = fillClr;
-      ctx.fill();
-
-      // Labels: 0, 25, 50, 75, 100
-      ctx.font = '8px monospace';
-      ctx.fillStyle = isLight ? '#94a3b8' : '#475569';
-      ctx.textAlign = 'center';
-      [0, 25, 50, 75, 100].forEach(function (v) {
-        var a = startA + (v / 100) * Math.PI;
-        var lx = cx + (r + 10) * Math.cos(a);
-        var ly = cy + (r + 10) * Math.sin(a);
-        ctx.fillText(v, lx, ly);
-      });
-    }
-
-    // ── Render progress bars ──
-    function _renderBars() {
-      var el = document.getElementById('ovProgressBars');
-      if (!el) return;
-      var pp = window.P || [];
-      if (!pp.length) {
-        el.innerHTML = '<div style="color:var(--mt);font-size:11px;text-align:center;padding:16px">Belum ada project</div>';
-        return;
-      }
-      var sc = { 'On Track': 'var(--gn)', 'Delayed': 'var(--yw)', 'Critical': 'var(--rd)', 'Planning': 'var(--bl)', 'Done': 'var(--pu)' };
-      el.innerHTML = pp.map(function (p) {
-        var v   = (p.actual || 0) - (p.plan || 0);
-        var vc  = v >= 0 ? 'var(--gn)' : 'var(--rd)';
-        var clr = sc[p.status] || 'var(--mt)';
-        var act = Math.min(p.actual || 0, 100);
-        var pln = Math.min(p.plan || 0, 100);
-        return [
-          '<div>',
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">',
-              '<div style="font-size:10px;color:var(--tx);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">',
-                '<span style="font-family:var(--fm);color:', clr, ';margin-right:4px">', (p.kode || ''), '</span>',
-                '<span style="color:var(--mt)">', p.nama, '</span>',
-              '</div>',
-              '<div style="font-size:9px;font-family:var(--fm);color:', vc, '">', (v >= 0 ? '+' : ''), v, '%</div>',
-            '</div>',
-            '<div style="height:7px;background:var(--bd);border-radius:4px;position:relative;overflow:hidden">',
-              '<div style="position:absolute;left:0;top:0;height:100%;width:', pln, '%;background:rgba(59,130,246,.25);border-radius:4px"></div>',
-              '<div style="position:absolute;left:0;top:0;height:100%;width:', act, '%;background:', clr, ';border-radius:4px;transition:width .5s ease"></div>',
-            '</div>',
-            '<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--mt);margin-top:2px">',
-              '<span>Plan: ', (p.plan || 0), '%</span>',
-              '<span>Actual: <span style="color:', clr, '">', (p.actual || 0), '%</span></span>',
-            '</div>',
-          '</div>'
-        ].join('');
-      }).join('');
-    }
-
-    // ── Render Risk Matrix (Bubble Chart) ──
-    function _renderRisk() {
-      _waitChart(function () {
-        var canvas = document.getElementById('ovRiskChart');
-        if (!canvas) return;
-
-        if (_charts.risk) { try { _charts.risk.destroy(); } catch (e) {} _charts.risk = null; }
-
-        var pp = window.P || [];
-        if (!pp.length) return;
-
-        var today  = new Date();
-        var isLight = document.documentElement.classList.contains('light');
-        var textClr = isLight ? '#64748b' : '#94a3b8';
-        var gridClr = isLight ? 'rgba(0,0,0,.05)' : 'rgba(255,255,255,.05)';
-
-        var statusClrs = {
-          'On Track': '#10b981', 'Delayed': '#f59e0b',
-          'Critical': '#ef4444', 'Planning': '#3b82f6', 'Done': '#8b5cf6'
-        };
-
-        var datasets = pp.map(function (p) {
-          var iss = (window.ISS || []).filter(function (i) {
-            return i.projId === p.id && i.status !== 'Closed';
-          }).length;
-          var days = p.selesai
-            ? Math.round((new Date(p.selesai) - today) / 86400000)
-            : null;
-          var clr = statusClrs[p.status] || '#64748b';
-          return {
-            label: (p.kode || p.nama.slice(0, 8)),
-            data: [{
-              x: p.actual || 0,
-              y: days !== null ? days : 999,
-              r: Math.max(5, Math.min(22, 6 + iss * 3.5))
-            }],
-            backgroundColor: clr + 'aa',
-            borderColor: clr,
-            borderWidth: 1.5,
-            _projId: p.id
-          };
-        });
-
-        // Legend
-        var legEl = document.getElementById('ovRiskLegend');
-        if (legEl) {
-          legEl.innerHTML = Object.keys(statusClrs).map(function (k) {
-            var cnt = pp.filter(function (p) { return p.status === k; }).length;
-            if (!cnt) return '';
-            return '<span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:50%;background:' + statusClrs[k] + ';display:inline-block"></span>' + k + ' (' + cnt + ')</span>';
-          }).join('');
-        }
-
-        _charts.risk = new Chart(canvas, {
-          type: 'bubble',
-          data: { datasets: datasets },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  title: function (items) {
-                    var ds = items[0].dataset;
-                    var proj = pp.find(function (p) { return p.id === ds._projId; });
-                    return proj ? proj.nama : ds.label;
-                  },
-                  label: function (ctx) {
-                    var ds  = ctx.dataset;
-                    var proj = pp.find(function (p) { return p.id === ds._projId; });
-                    var iss  = (window.ISS || []).filter(function (i) { return i.projId === ds._projId && i.status !== 'Closed'; }).length;
-                    return [
-                      'Status: ' + (proj ? proj.status : '—'),
-                      'Progress: ' + ctx.raw.x + '%',
-                      'Sisa: ' + (ctx.raw.y === 999 ? 'N/A' : ctx.raw.y + ' hari'),
-                      'Open Issues: ' + iss
-                    ];
-                  }
-                }
-              }
-            },
-            scales: {
-              x: {
-                title: { display: true, text: 'Progress Actual (%)', color: textClr, font: { size: 9 } },
-                min: 0, max: 100,
-                ticks: { color: textClr, font: { size: 9 }, stepSize: 25 },
-                grid: { color: gridClr }
-              },
-              y: {
-                title: { display: true, text: 'Sisa Hari', color: textClr, font: { size: 9 } },
-                ticks: { color: textClr, font: { size: 9 } },
-                grid: { color: gridClr }
-              }
-            }
-          }
-        });
-      });
-    }
-
-    // ── Master render ──
-    function renderOVInfographics() {
-      _inject();
-
-      var h  = _calcHealth();
-      var sc = document.getElementById('ovHealthScore');
-      var sl = document.getElementById('ovHealthLabel');
-      var sb = document.getElementById('ovHealthBadge');
-      var bd = document.getElementById('ovHealthBreakdown');
-
-      if (sc) { sc.textContent = h.score; sc.style.color = _cssVar(h.color); }
-      if (sl) { sl.textContent = h.label; sl.style.color = _cssVar(h.color); }
-      if (sb) {
-        sb.textContent = h.score + '/100';
-        sb.style.background = _cssVar(h.color) + '22';
-        sb.style.color = _cssVar(h.color);
-        sb.style.border = '1px solid ' + _cssVar(h.color) + '55';
-      }
-      if (bd) {
-        bd.innerHTML = Object.entries(h.breakdown).map(function (kv) {
-          return '<div style="display:flex;justify-content:space-between"><span>' + kv[0] + '</span><span style="font-family:var(--fm)">' + kv[1] + '</span></div>';
-        }).join('');
-      }
-
-      _drawGauge(h.score, h.color);
-      _renderBars();
-      _renderRisk();
-    }
-
-    // ── Patch renderOV ──
-    var _origRenderOV = window.renderOV;
-    window.renderOV = function () {
-      if (_origRenderOV) _origRenderOV.apply(this, arguments);
-      try { renderOVInfographics(); } catch (e) { console.warn('[OVI]', e); }
-    };
-
-    // Re-draw gauge on theme toggle (light/dark)
-    var _origToggleTheme = window.toggleTheme;
-    window.toggleTheme = function () {
-      if (_origToggleTheme) _origToggleTheme.apply(this, arguments);
-      setTimeout(function () {
-        try { renderOVInfographics(); } catch (e) {}
-      }, 100);
-    };
-
-    // Responsive: redraw on resize
-    var _rszTimer;
-    window.addEventListener('resize', function () {
-      clearTimeout(_rszTimer);
-      _rszTimer = setTimeout(function () {
-        if (document.getElementById('ovGaugeCanvas')) {
-          try { renderOVInfographics(); } catch (e) {}
-        }
-      }, 300);
-    });
-
-    window.renderOVInfographics = renderOVInfographics;
-    console.log('✅ Portfolio Infographic Patch loaded');
-  })();
-
   // ── 16. FIX VIEWER MODE WBS — nama & bobot tersembunyi ──────
   // Masalah: nama subcat/item dibungkus .wbs-inline-text.edit-only
   // yang disembunyikan CSS untuk viewer-mode.
@@ -12630,6 +12234,660 @@ document.addEventListener('visibilitychange',()=>{
     // No-op: skip GSheet request, pakai default values saja
     return Promise.resolve();
   };
+
+  // ══════════════════════════════════════════════════════════
+  // FIX 1 — Deduplikasi loadFromSupabase()
+  // ══════════════════════════════════════════════════════════
+  // Root cause:
+  //   a) doLogin() → _loginSuccess() → autoLoadOnStart() → loadFromSupabase() [1]
+  //      lalu doLogin() langsung memanggil loadFromSupabase() lagi             [2]
+  //   b) _initAuthListener() mendengar SIGNED_IN → loadFromSupabase()          [3]
+  //
+  // Solusi: Wrap window.loadFromSupabase dengan dedup promise.
+  // Semua caller (doLogin, autoLoadOnStart, _initAuthListener) me-resolve
+  // window.loadFromSupabase via scope chain → override ini selalu tertangkap.
+  (function () {
+    const _orig = window.loadFromSupabase;
+    if (typeof _orig !== 'function') { console.warn('[Fix1] loadFromSupabase not found'); return; }
+
+    let _running = null; // promise yang sedang berjalan
+
+    window.loadFromSupabase = function () {
+      // Jika load sedang berjalan, kembalikan promise yang sama (bukan load baru)
+      if (_running) {
+        console.log('[loadFromSupabase] Deduplicated — returning in-progress promise');
+        return _running;
+      }
+      // Mulai load baru, simpan promise-nya
+      _running = Promise.resolve().then(() => _orig.apply(this, arguments))
+        .finally(function () { _running = null; });
+      return _running;
+    };
+
+    console.log('✅ Fix 1: loadFromSupabase dedup aktif');
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  // FIX 2 — Verifikasi session Supabase saat halaman dimuat
+  // ══════════════════════════════════════════════════════════
+  // Root cause:
+  //   checkSession() hanya cek localStorage timer 8 jam, tidak verifikasi
+  //   token Supabase (expire ~1 jam). Akibatnya user terlihat login di UI
+  //   tapi API call ke Supabase bisa dapat 401 secara diam-diam.
+  //
+  // Solusi:
+  //   1. Saat halaman load, cek Supabase session aktif via getSession()
+  //   2. Jika token habis, coba refresh. Jika gagal → paksa re-login
+  //   3. Jadwalkan auto-refresh token setiap 50 menit (Supabase expire ~1 jam)
+  (function () {
+
+    // ── Paksa re-login (tampilkan auth screen) ──────────────
+    function _forceRelogin(reason) {
+      console.warn('[Session]', reason, '— meminta login ulang');
+      localStorage.removeItem('atw_session');
+      const as = document.getElementById('authScreen');
+      if (as) {
+        as.style.cssText = [
+          'position:fixed;inset:0;z-index:9999;display:flex;',
+          'align-items:center;justify-content:center;flex-direction:column;',
+          'background:linear-gradient(135deg,#060a14 0%,#0a0f1e 50%,#0d1525 100%)'
+        ].join('');
+      }
+      try { toast('Sesi berakhir, silakan login kembali', 'error'); } catch (e) {}
+      // Sign out dari Supabase agar token lama tidak tersimpan di browser
+      try {
+        const c = (typeof _initSb === 'function') ? _initSb() : null;
+        if (c) c.auth.signOut();
+      } catch (e) {}
+    }
+
+    // ── Update timestamp localStorage agar 8 jam selalu fresh ──
+    function _refreshLocalSession() {
+      try {
+        const s = JSON.parse(localStorage.getItem('atw_session') || '{}');
+        if (s.role) {
+          localStorage.setItem('atw_session', JSON.stringify({ role: s.role, ts: Date.now() }));
+        }
+      } catch (e) {}
+    }
+
+    // ── Cek apakah user sedang dalam keadaan logged in ──────
+    function _isLoggedIn() {
+      const as = document.getElementById('authScreen');
+      // auth screen tersembunyi = user sudah login
+      return as && (as.style.display === 'none' || !as.style.cssText.includes('fixed'));
+    }
+
+    // ── Verifikasi sesi Supabase (async) ────────────────────
+    async function _verifySbSession() {
+      if (!_isLoggedIn()) return; // belum login, skip
+
+      const client = (typeof _initSb === 'function') ? _initSb() : null;
+      if (!client) return;
+
+      try {
+        const { data: { session }, error } = await client.auth.getSession();
+
+        if (error) {
+          console.warn('[Session] getSession error:', error.message);
+          return; // error jaringan, jangan paksa logout
+        }
+
+        if (!session) {
+          // Token tidak ada di browser — coba refresh
+          const { data: refreshData, error: refreshErr } = await client.auth.refreshSession();
+          if (refreshErr || !refreshData.session) {
+            _forceRelogin('Token Supabase expired dan tidak bisa di-refresh');
+            return;
+          }
+          // Refresh berhasil
+          _refreshLocalSession();
+          console.log('[Session] Token di-refresh otomatis ✓');
+          return;
+        }
+
+        // Session valid — perbarui localStorage timestamp
+        _refreshLocalSession();
+
+        // Cek apakah token hampir habis (sisa < 5 menit)
+        const expiresAt = session.expires_at; // unix timestamp
+        if (expiresAt && (expiresAt - Math.floor(Date.now() / 1000)) < 300) {
+          const { data: refreshData, error: refreshErr } = await client.auth.refreshSession();
+          if (!refreshErr && refreshData.session) {
+            _refreshLocalSession();
+            console.log('[Session] Token di-refresh preventif (sisa < 5 menit) ✓');
+          }
+        }
+
+      } catch (e) {
+        console.warn('[Session] Verification exception:', e.message);
+        // Jangan paksa logout jika terjadi error jaringan
+      }
+    }
+
+    // ── Auto-refresh token setiap 50 menit ──────────────────
+    function _scheduleTokenRefresh() {
+      setInterval(async function () {
+        if (!_isLoggedIn()) return;
+        const client = (typeof _initSb === 'function') ? _initSb() : null;
+        if (!client) return;
+        try {
+          const { data, error } = await client.auth.refreshSession();
+          if (!error && data.session) {
+            _refreshLocalSession();
+            console.log('[Session] Auto-refresh token ✓ —', new Date().toLocaleTimeString('id-ID'));
+          } else if (error) {
+            // Refresh gagal — cek apakah masih ada session
+            const { data: { session } } = await client.auth.getSession();
+            if (!session) _forceRelogin('Auto-refresh gagal dan tidak ada session aktif');
+          }
+        } catch (e) {
+          console.warn('[Session] Auto-refresh error:', e.message);
+        }
+      }, 50 * 60 * 1000); // setiap 50 menit
+    }
+
+    // ── Jalankan verifikasi saat page load ──────────────────
+    // Untuk user yang sudah login sebelumnya (via checkSession)
+    if (document.readyState === 'complete') {
+      setTimeout(_verifySbSession, 1000); // delay kecil agar _initSb() sudah siap
+    } else {
+      window.addEventListener('load', function () {
+        setTimeout(_verifySbSession, 1000);
+      });
+    }
+
+    // Jadwalkan auto-refresh
+    _scheduleTokenRefresh();
+
+    // Expose untuk debugging
+    window._verifySbSession = _verifySbSession;
+
+    console.log('✅ Fix 2: Session verification + auto-refresh aktif (setiap 50 menit)');
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  // FIX 3 — Bersihkan referensi GSheet di save bar
+  // ══════════════════════════════════════════════════════════
+  // Root cause (3 sumber):
+  //   a) setInterval(_rtPoll, 15000) memanggil _rtPoll original setiap 15 detik
+  //      → _rtPoll set smsg = 'GSheet ✓ · time'
+  //      → Fix: gsOk=false agar _rtPoll return early (baris 11009: if(!gsOk||...)return)
+  //   b) autoLoadOnStart() original dipanggil dari initAuth() SEBELUM migration patch
+  //      → set flabel = 'Google Sheet · time'
+  //      → Fix: re-trigger loadFromSupabase + update flabel untuk returning users
+  //   c) Dropdown Data masih ada "Sync ke GSheet" / "Load dari GSheet"
+  //      → Fix: sembunyikan item-item tersebut
+  (function () {
+
+    // ── A. Stop _rtPoll — set gsOk=false ─────────────────────
+    // _rtPoll cek: if(!gsOk||!gsUrl||!_rtOnline)return; (line 11009)
+    // Dengan gsOk=false, SEMUA call _rtPoll dari setInterval jadi no-op.
+    try { gsOk = false; gsUrl = ''; } catch (e) {}
+
+    // ── B. Tampilkan email user di flabel ─────────────────────
+    // Menggantikan "Google Sheet · time" dengan info Supabase user.
+    async function _updateFlabel() {
+      const flabel = document.getElementById('flabel');
+      if (!flabel) return;
+      try {
+        const client = (typeof _initSb === 'function') ? _initSb() : null;
+        if (!client) { flabel.textContent = '\u2601 Supabase'; return; }
+        const { data } = await client.auth.getUser();
+        if (data && data.user) {
+          const stored = JSON.parse(localStorage.getItem('atw_session') || '{}');
+          const role = stored.role || (typeof currentRole !== 'undefined' ? currentRole : '');
+          const shortEmail = (data.user.email || '').split('@')[0];
+          flabel.textContent = '\u2601 ' + shortEmail + (role ? ' \u00b7 ' + role : '');
+        } else {
+          flabel.textContent = '\u2601 Supabase';
+        }
+      } catch (e) {
+        const fl = document.getElementById('flabel');
+        if (fl) fl.textContent = '\u2601 Supabase';
+      }
+    }
+
+    // ── C. Untuk returning users: trigger Supabase load ───────
+    // initAuth() memanggil autoLoadOnStart() ORIGINAL sebelum migration patch.
+    // Hasilnya: smsg = "Memuat cache lokal — menghubungi GSheet..."
+    // Fix: cek jika user sudah login via checkSession → panggil loadFromSupabase
+    (function _fixReturningUser() {
+      const as = document.getElementById('authScreen');
+      const isLoggedIn = as && (as.style.display === 'none' ||
+        (as.style.cssText && !as.style.cssText.includes('fixed')));
+      if (!isLoggedIn) return; // belum login, skip
+
+      // Update smsg agar tidak tampil pesan GSheet
+      const smsg = document.getElementById('smsg');
+      const sdot = document.getElementById('sdot');
+      if (smsg && (smsg.textContent.includes('GSheet') || smsg.textContent.includes('Google'))) {
+        smsg.textContent = 'Menghubungkan ke Supabase...';
+      }
+      if (sdot) { sdot.style.background = 'var(--yw)'; sdot.classList.remove('unsaved'); }
+
+      // Load data dari Supabase (replace data GSheet jika ada)
+      setTimeout(async function () {
+        try {
+          if (typeof loadFromSupabase === 'function') await loadFromSupabase();
+        } catch (e) { console.warn('[Fix3-C]', e.message); }
+        _updateFlabel();
+      }, 400);
+    })();
+
+    // ── D. Patch autoLoadOnStart — tambahkan flabel update ────
+    // Agar flabel selalu di-update setelah Supabase load selesai
+    // (berlaku untuk new login via doLogin)
+    const _origAutoLoad3 = window.autoLoadOnStart;
+    window.autoLoadOnStart = async function () {
+      if (typeof _origAutoLoad3 === 'function') await _origAutoLoad3.apply(this, arguments);
+      setTimeout(_updateFlabel, 500);
+    };
+
+    // ── E. Sembunyikan elemen GSheet di save bar ──────────────
+    function _cleanSbarGsUI() {
+      // Sembunyikan item dropdown GSheet
+      ['btnSync', 'btnLoad'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display = 'none';
+        // Sembunyikan separator setelah item jika ada
+        const next = el.nextElementSibling;
+        if (next && next.classList && next.classList.contains('sbar-dd-sep')) {
+          next.style.display = 'none';
+        }
+      });
+
+      // Sembunyikan GSheet badge di header (redundant tapi pastikan hilang)
+      const badge = document.getElementById('gsBadge');
+      if (badge) badge.style.display = 'none';
+
+      // Jika smsg masih menampilkan teks GSheet, ganti
+      const smsg = document.getElementById('smsg');
+      if (smsg) {
+        const t = smsg.textContent || '';
+        if (t.includes('GSheet') || t.includes('Google Sheet') ||
+            t.includes('cache lokal') || t.includes('menghubungi')) {
+          smsg.textContent = 'Siap \u2014 Supabase';
+        }
+      }
+    }
+    setTimeout(_cleanSbarGsUI, 600);
+
+    // ── F. Override _sbStatusOk — jaga flabel tetap Supabase ──
+    // Setelah setiap save berhasil, pastikan flabel tidak kembali ke GSheet text
+    const _origStatusOk2 = window._sbStatusOk;
+    window._sbStatusOk = function () {
+      if (typeof _origStatusOk2 === 'function') _origStatusOk2.apply(this, arguments);
+      const fl = document.getElementById('flabel');
+      if (fl && (fl.textContent.includes('Google') || fl.textContent.includes('GSheet') ||
+                 fl.textContent === '\u2014' || fl.textContent === 'Belum ada file' ||
+                 fl.textContent === 'Lokal' || fl.textContent === 'Cache Offline')) {
+        _updateFlabel();
+      }
+    };
+
+    console.log('\u2705 Fix 3: Save bar GSheet references dibersihkan');
+  })();
+
+  // ══════════════════════════════════════════════════════════
+  // RETRY QUEUE + OFFLINE MODE
+  // ══════════════════════════════════════════════════════════
+  // Arsitektur:
+  //   Semua save akhirnya memanggil _sbStatusErr saat gagal.
+  //   Kita intercept _sbStatusErr + hook tiap window.save* untuk capture data.
+  //   Data pending disimpan ke localStorage (atw_sq) → di-flush saat online kembali.
+  //   Offline mode: navigator.onLine check di setiap save, queue langsung.
+  (function () {
+
+    var QUEUE_KEY = 'atw_sq';
+    var MAX_Q = 80;
+    var _errFlag = 0; // timestamp terakhir _sbStatusErr dipanggil
+
+    // ── Queue helpers ─────────────────────────────────────────
+    function _qLoad() {
+      try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function _qSave(q) {
+      try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q.slice(-MAX_Q))); } catch (e) {}
+    }
+    function _qAdd(op) {
+      var q = _qLoad();
+      // Dedup: ganti item dengan key yang sama
+      if (op.key) {
+        var idx = q.findIndex(function (x) { return x.key === op.key; });
+        if (idx >= 0) { q[idx] = op; } else { q.push(op); }
+      } else {
+        q.push(op);
+      }
+      _qSave(q);
+      _uiBadge();
+    }
+    function _qRemove(opId) {
+      _qSave(_qLoad().filter(function (x) { return x.id !== opId; }));
+      _uiBadge();
+    }
+    function _qClear() {
+      localStorage.removeItem(QUEUE_KEY);
+      _uiBadge();
+    }
+
+    // ── Badge UI ──────────────────────────────────────────────
+    function _uiBadge() {
+      var q = _qLoad();
+      var badge = document.getElementById('_sqBadge');
+      if (!badge) {
+        var info = document.querySelector('#sbar .sbar-info');
+        if (!info) return;
+        badge = document.createElement('span');
+        badge.id = '_sqBadge';
+        badge.title = 'Operasi tertunda — klik untuk kirim ulang';
+        badge.style.cssText = [
+          'display:none;margin-left:8px;padding:1px 8px;border-radius:10px;',
+          'font-size:9px;font-family:var(--fm);cursor:pointer;',
+          'background:rgba(249,115,22,.15);color:var(--or);',
+          'border:1px solid rgba(249,115,22,.3);animation:pulse 2s infinite'
+        ].join('');
+        badge.onclick = function () { _flush(); };
+        info.appendChild(badge);
+      }
+      if (q.length === 0) {
+        badge.style.display = 'none';
+      } else {
+        badge.style.display = 'inline-block';
+        badge.textContent = '\u21bb ' + q.length + ' tertunda';
+      }
+    }
+
+    // ── Intercept _sbStatusErr ────────────────────────────────
+    // Saat error save terdeteksi, tandai waktunya
+    var _origSbErr = window._sbStatusErr;
+    window._sbStatusErr = function (msg) {
+      _errFlag = Date.now();
+      if (typeof _origSbErr === 'function') _origSbErr.call(this, msg);
+    };
+    function _hadErr() { return (Date.now() - _errFlag) < 600; }
+
+    // ── Offline indicator ─────────────────────────────────────
+    function _setOfflineUI(on) {
+      var smsg = document.getElementById('smsg');
+      var sdot = document.getElementById('sdot');
+      if (on) {
+        if (smsg) smsg.textContent = '\u26a1 Offline \u2014 perubahan tersimpan lokal';
+        if (sdot) sdot.style.background = 'var(--or)';
+      } else {
+        if (sdot) { sdot.style.background = 'var(--gn)'; sdot.classList.remove('unsaved'); }
+        var q = _qLoad();
+        if (smsg) smsg.textContent = q.length > 0
+          ? 'Online \u2014 memproses ' + q.length + ' operasi tertunda...'
+          : 'Online \u2014 Supabase';
+      }
+    }
+
+    // ── Thin wrapper: capture pending op sebelum call ─────────
+    // op = { key, fn, retry }
+    // fn()    = fungsi async yang melakukan save
+    // retry() = fungsi async untuk re-execute saat flush
+    async function _withQueue(op, fn) {
+      // Cek offline
+      if (!navigator.onLine) {
+        _qAdd({ id: _uid(), key: op.key, type: op.type, payload: op.payload, ts: Date.now() });
+        _setOfflineUI(true);
+        try { toast('Offline \u2014 akan dikirim otomatis saat koneksi pulih', 'info'); } catch (e) {}
+        return;
+      }
+
+      _errFlag = 0;
+      try {
+        await fn();
+      } catch (e) {
+        _errFlag = Date.now();
+        try { _sbStatusErr(e.message); } catch (ee) {}
+      }
+
+      // Jika ada error (dari catch ATAU dari _sbStatusErr yang dipanggil internal)
+      if (_hadErr() && op.payload) {
+        _qAdd({ id: _uid(), key: op.key, type: op.type, payload: op.payload, ts: Date.now() });
+        try { toast('\u26a0 Gagal simpan \u2014 akan dicoba ulang otomatis', 'error'); } catch (e) {}
+      }
+    }
+    function _uid() { return Date.now() + '_' + Math.random().toString(36).slice(2, 7); }
+
+    // ── Flush queue → kirim ke Supabase ──────────────────────
+    var _flushing = false;
+    async function _flush() {
+      if (_flushing || !navigator.onLine) return;
+      var q = _qLoad();
+      if (!q.length) return;
+
+      _flushing = true;
+      var smsg = document.getElementById('smsg');
+      if (smsg) smsg.textContent = 'Mengirim ' + q.length + ' operasi tertunda...';
+
+      var ok = 0, fail = 0;
+      var client = (typeof _initSb === 'function') ? _initSb() : null;
+
+      for (var i = 0; i < q.length; i++) {
+        var op = q[i];
+        try {
+          await _execOp(op, client);
+          _qRemove(op.id);
+          ok++;
+        } catch (e) {
+          console.warn('[SQ flush fail]', op.type, e.message);
+          fail++;
+        }
+      }
+      _flushing = false;
+      _uiBadge();
+
+      if (ok > 0 && fail === 0) {
+        try { toast(ok + ' operasi berhasil tersimpan ke Supabase \u2713'); } catch (e) {}
+        if (typeof _sbStatusOk === 'function') _sbStatusOk();
+      } else if (fail > 0) {
+        try { toast(fail + ' operasi gagal \u2014 klik badge untuk coba lagi', 'error'); } catch (e) {}
+      }
+    }
+
+    // ── Eksekusi satu operasi queue → langsung ke Supabase ───
+    async function _execOp(op, client) {
+      if (!client) throw new Error('No Supabase client');
+      var p = op.payload;
+      switch (op.type) {
+
+        case 'patch': {
+          var payload = Object.assign({}, p.fields, { updated_at: new Date().toISOString() });
+          var r = await client.from(p.table).update(payload).eq('id', p.id);
+          if (r.error) throw r.error;
+          break;
+        }
+        case 'upsert': {
+          var r2 = await client.from(p.table).upsert(p.row, { onConflict: 'id' });
+          if (r2.error) throw r2.error;
+          break;
+        }
+        case 'manpower': {
+          var r3 = await client.from('manpower_logs').upsert(
+            typeof unmapManpower === 'function' ? unmapManpower(p.entry) : p.entry,
+            { onConflict: 'id' }
+          );
+          if (r3.error) throw r3.error;
+          break;
+        }
+        case 'issue': {
+          var r4 = await client.from('issues').upsert(
+            typeof unmapIssue === 'function' ? unmapIssue(p.iss) : p.iss,
+            { onConflict: 'id' }
+          );
+          if (r4.error) throw r4.error;
+          break;
+        }
+        case 'procurement': {
+          var r5 = await client.from('procurement').upsert(
+            typeof unmapProcurement === 'function' ? unmapProcurement(p.proc) : p.proc,
+            { onConflict: 'id' }
+          );
+          if (r5.error) throw r5.error;
+          break;
+        }
+        case 'cost': {
+          var r6 = await client.from('costs').upsert(
+            typeof unmapCost === 'function' ? unmapCost(p.cost) : p.cost,
+            { onConflict: 'id' }
+          );
+          if (r6.error) throw r6.error;
+          break;
+        }
+        default:
+          throw new Error('Unknown op type: ' + op.type);
+      }
+    }
+
+    // ── Re-override save functions paling penting ─────────────
+
+    // saveUpdate (progress — paling kritis)
+    var _migSaveUpdate = window.saveUpdate;
+    window.saveUpdate = async function () {
+      var proj = P.find(function (x) { return x.id === selId; });
+      var snap = proj ? {
+        id: proj.id, plan: proj.plan, actual: proj.actual,
+        status: proj.status, notes: proj.notes, mpActual: proj.mpActual
+      } : null;
+      await _withQueue(
+        { key: 'upd|' + (snap && snap.id), type: 'patch',
+          payload: snap ? { table: 'projects', id: snap.id, fields: {
+            plan: snap.plan, actual: snap.actual, mp_actual: snap.mpActual || 0,
+            status: snap.status, notes: snap.notes || null
+          }} : null },
+        function () { return _migSaveUpdate.apply(this, arguments); }.bind(this)
+      );
+    };
+
+    // saveProj (project metadata)
+    var _migSaveProj = window.saveProj;
+    window.saveProj = async function () {
+      await _withQueue(
+        { key: 'proj|' + (typeof editProjId !== 'undefined' ? editProjId : '_new'),
+          type: 'upsert',
+          payload: null }, // payload di-capture setelah original berjalan di flush
+        function () { return _migSaveProj.apply(this, arguments); }.bind(this)
+      );
+    };
+
+    // saveMp (manpower — sering dipakai)
+    var _migSaveMp = window.saveMp;
+    window.saveMp = async function () {
+      var projId = document.getElementById('mpProj') && document.getElementById('mpProj').value || '';
+      var date = document.getElementById('mpDate') && document.getElementById('mpDate').value
+                 || new Date().toISOString().slice(0, 10);
+      await _withQueue(
+        { key: 'mp|' + projId + '|' + date, type: 'manpower', payload: null },
+        async function () {
+          await _migSaveMp.apply(this, arguments);
+          // Capture entry setelah original memprosesnya
+          var entry = MPLOGS.find(function (m) {
+            return String(m.projId) === String(projId) && m.date === date;
+          });
+          if (entry) {
+            var q = _qLoad();
+            var key = 'mp|' + projId + '|' + date;
+            var item = q.find(function (x) { return x.key === key; });
+            if (item && !item.payload.entry) {
+              item.payload = { entry: entry };
+              _qSave(q);
+            }
+          }
+        }.bind(this)
+      );
+    };
+
+    // saveIss (issues)
+    var _migSaveIss = window.saveIss;
+    window.saveIss = async function () {
+      var prevId = typeof editIssId !== 'undefined' ? editIssId : null;
+      await _withQueue(
+        { key: 'iss|' + (prevId || '_new'), type: 'issue', payload: null },
+        async function () {
+          await _migSaveIss.apply(this, arguments);
+          var iss = prevId ? ISS.find(function (x) { return String(x.id) === String(prevId); })
+                           : ISS[ISS.length - 1];
+          if (iss) {
+            var q2 = _qLoad();
+            var key2 = 'iss|' + (prevId || '_new');
+            var item2 = q2.find(function (x) { return x.key === key2; });
+            if (item2) { item2.payload = { iss: iss }; _qSave(q2); }
+          }
+        }.bind(this)
+      );
+    };
+
+    // saveProc (procurement)
+    var _migSaveProc = window.saveProc;
+    window.saveProc = async function () {
+      var prevId = typeof editProcId !== 'undefined' ? editProcId : null;
+      await _withQueue(
+        { key: 'proc|' + (prevId || '_new'), type: 'procurement', payload: null },
+        async function () {
+          await _migSaveProc.apply(this, arguments);
+          var proc = prevId ? PROC.find(function (x) { return String(x.id) === String(prevId); })
+                            : PROC[PROC.length - 1];
+          if (proc) {
+            var q3 = _qLoad();
+            var key3 = 'proc|' + (prevId || '_new');
+            var item3 = q3.find(function (x) { return x.key === key3; });
+            if (item3) { item3.payload = { proc: proc }; _qSave(q3); }
+          }
+        }.bind(this)
+      );
+    };
+
+    // saveCost (biaya)
+    var _migSaveCost = window.saveCost;
+    window.saveCost = async function () {
+      var prevId = typeof editCostId !== 'undefined' ? editCostId : null;
+      await _withQueue(
+        { key: 'cost|' + (prevId || '_new'), type: 'cost', payload: null },
+        async function () {
+          await _migSaveCost.apply(this, arguments);
+          var cost = prevId ? COSTS.find(function (x) { return String(x.id) === String(prevId); })
+                            : COSTS[COSTS.length - 1];
+          if (cost) {
+            var q4 = _qLoad();
+            var key4 = 'cost|' + (prevId || '_new');
+            var item4 = q4.find(function (x) { return x.key === key4; });
+            if (item4) { item4.payload = { cost: cost }; _qSave(q4); }
+          }
+        }.bind(this)
+      );
+    };
+
+    // ── Online / offline events ───────────────────────────────
+    window.addEventListener('offline', function () { _setOfflineUI(true); });
+    window.addEventListener('online', function () {
+      _setOfflineUI(false);
+      setTimeout(_flush, 1000); // delay kecil agar koneksi stabil
+    });
+
+    // Saat halaman dimuat: cek status & flush jika ada pending
+    if (!navigator.onLine) { _setOfflineUI(true); }
+    setTimeout(function () {
+      _uiBadge();
+      if (navigator.onLine && _qLoad().length > 0) {
+        var smsg = document.getElementById('smsg');
+        if (smsg) smsg.textContent = 'Ditemukan ' + _qLoad().length + ' operasi tertunda dari sesi sebelumnya...';
+        setTimeout(_flush, 1500);
+      }
+    }, 2500);
+
+    // Expose untuk debugging via console
+    window._sbQueue = {
+      flush: _flush,
+      list: _qLoad,
+      clear: function () { _qClear(); toast('Queue dibersihkan'); }
+    };
+
+    console.log('\u2705 Retry queue + offline mode aktif');
+  })();
 
 })();
 </script>
