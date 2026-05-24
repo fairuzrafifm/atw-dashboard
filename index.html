@@ -624,7 +624,7 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
 </style>
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
+<script><script src="js/supabase.js"></script>
 // === EARLY LOGIN SYSTEM v3 ===
 var selectedRoleLogin = null;
 var currentRole = null;
@@ -2497,621 +2497,7 @@ let selId=null,editProjId=null,editIssId=null,editProcId=null,editRabId=null,edi
 let isDirty=false,pendImp=null,curFile=null,activeTab='overview';
 let gsUrl='',gsSheet='',gsOk=false;
 const _DEFAULT_GS_URL='https://script.google.com/macros/s/AKfycbxTbt9evowelUh1zmsTvbFGQlOL8NY4rlvHdO1IWJobWQ2P8_oo4ebbdn-mnDHFiPRz/exec';
-// ============================================================
-//  ATW Solar Dashboard — Supabase Client
-//  Ganti bagian GAS sync di index.html dengan kode ini
-//  Versi: 1.0.0
-// ============================================================
 
-// ── 0. CONFIG — isi setelah buat project di supabase.com ──
-// SUPABASE_URL sudah dideklarasikan di atas (var)
-    var _SB_URL = 'https://mbdhnrhoqwljhtkavsrr.supabase.co';
-var _SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1iZGhucmhvcXdsamh0a2F2c3JyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxNjIzMDgsImV4cCI6MjA5NDczODMwOH0.N2mTpEcOkzPHYkLJMf9L5vIwZTjvZXUaOeMXcX9sJ_o';
-
-// ── 1. INIT CLIENT ──
-// Tambahkan di <head>:
-// supabase-js@2 sudah dimuat di atas (lihat <head>)
-let sb = null;
-function _initSb(){
-  if(sb) return sb;
-  try{
-    const { createClient } = supabase;
-    var sbUrl = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : _SB_URL);
-    var sbAnon = (typeof SUPABASE_ANON !== 'undefined' ? SUPABASE_ANON : _SB_ANON);
-    sb = createClient(sbUrl, sbAnon);
-  }catch(e){ console.warn('Supabase init error:',e); }
-  return sb;
-}
-// init segera jika supabase sudah tersedia, jika tidak tunggu window load
-if(typeof supabase !== 'undefined'){ _initSb(); }
-else{ window.addEventListener('load', _initSb); }
-
-// ── 2. AUTH ──────────────────────────────────────────────────
-
-/** Login dengan email + password */
-async function sbLogin(email, password) {
-  const client = _initSb();
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
-}
-
-/** Logout */
-async function sbLogout() {
-  const client = _initSb();
-  await client.auth.signOut();
-}
-
-/** Get role user yang sedang login */
-async function sbGetRole() {
-  const client = _initSb();
-  const { data } = await client.from('user_profiles')
-    .select('role')
-    .eq('id', (await client.auth.getUser()).data.user?.id)
-    .single();
-  return data?.role || 'viewer';
-}
-
-/** Listen perubahan auth state */
-function _initAuthListener(){
-  const client = _initSb();
-  if(!client) return;
-  client.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN') {
-      loadFromSupabase();
-    } else if (event === 'SIGNED_OUT') {
-      document.getElementById('auth-screen')?.classList.remove('hidden');
-    }
-  });
-}
-window.addEventListener('load', _initAuthListener);
-
-// ── 3. LOAD ALL DATA ─────────────────────────────────────────
-
-async function loadFromSupabase() {
-  const client = _initSb();
-  if(!client){ toast('Supabase belum siap, coba lagi','error'); return; }
-  try {
-    toast('Memuat data dari server...', 'info');
-
-    const [
-      { data: projects },
-      { data: history },
-      { data: issues },
-      { data: procurement },
-      { data: manpowerLogs },
-      { data: accidentLogs },
-      { data: costs },
-      { data: rab },
-      { data: wbs },
-      { data: scurve },
-    ] = await Promise.all([
-      (_initSb()).from('projects').select('*').order('created_at'),
-      (_initSb()).from('project_history').select('*').order('date'),
-      (_initSb()).from('issues').select('*').order('created_at', { ascending: false }),
-      (_initSb()).from('procurement').select('*').order('created_at', { ascending: false }),
-      (_initSb()).from('manpower_logs').select('*').order('date', { ascending: false }),
-      (_initSb()).from('accident_logs').select('*').order('date', { ascending: false }),
-      (_initSb()).from('costs').select('*').eq('_deleted', false).order('date', { ascending: false }),
-      (_initSb()).from('rab').select('*').order('urutan'),
-      (_initSb()).from('wbs').select('*').order('order'),
-      (_initSb()).from('scurve').select('*').order('week'),
-    ]);
-
-    // Map dari snake_case Supabase → camelCase dashboard
-    P       = (projects || []).map(mapProject);
-    ISS     = (issues || []).map(mapIssue);
-    PROC    = (procurement || []).map(mapProcurement);
-    MPLOGS  = (manpowerLogs || []).map(mapManpower);
-    ACCLOGS = (accidentLogs || []).map(mapAccident);
-    COSTS   = (costs || []).map(mapCost);
-    RAB     = (rab || []).map(mapRab);
-    WBS     = (wbs || []).map(mapWbs);
-    SCURVE  = (scurve || []).map(mapScurve);
-
-    // Merge history ke masing-masing project
-    (history || []).forEach(h => {
-      const p = P.find(x => x.id === h.proj_id);
-      if (p) {
-        p.history = p.history || [];
-        p.history.push({
-          date: h.date, actual: h.actual, plan: h.plan,
-          mp: h.mp, notes: h.notes, status: h.status
-        });
-      }
-    });
-
-    render();
-    toast('Data berhasil dimuat ✓');
-    sbSubscribeRealtime();           // start listening perubahan realtime
-
-  } catch (err) {
-    toast('Gagal load data: ' + err.message, 'error');
-    console.error(err);
-  }
-}
-
-// ── 4. REALTIME SUBSCRIPTION ─────────────────────────────────
-
-let _realtimeChannel = null;
-
-function sbSubscribeRealtime() {
-  if (_realtimeChannel) _initSb().removeChannel(_realtimeChannel);
-
-  _realtimeChannel = (_initSb()).channel('atw-realtime')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' },
-      payload => _handleRealtimeChange('projects', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'issues' },
-      payload => _handleRealtimeChange('issues', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'procurement' },
-      payload => _handleRealtimeChange('procurement', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'costs' },
-      payload => _handleRealtimeChange('costs', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'manpower_logs' },
-      payload => _handleRealtimeChange('manpower_logs', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'accident_logs' },
-      payload => _handleRealtimeChange('accident_logs', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'wbs' },
-      payload => _handleRealtimeChange('wbs', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'scurve' },
-      payload => _handleRealtimeChange('scurve', payload))
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'photos' },
-      payload => _handleRealtimeChange('photos', payload))
-    .subscribe();
-}
-
-/** Handle perubahan realtime — update array lokal + re-render */
-function _handleRealtimeChange(table, payload) {
-  const { eventType, new: newRow, old: oldRow } = payload;
-
-  const tableMap = {
-    projects:      { arr: () => P,       mapper: mapProject,     key: 'id' },
-    issues:        { arr: () => ISS,      mapper: mapIssue,       key: 'id' },
-    procurement:   { arr: () => PROC,     mapper: mapProcurement, key: 'id' },
-    costs:         { arr: () => COSTS,    mapper: mapCost,        key: 'id' },
-    manpower_logs: { arr: () => MPLOGS,   mapper: mapManpower,    key: 'id' },
-    accident_logs: { arr: () => ACCLOGS,  mapper: mapAccident,    key: 'id' },
-    wbs:           { arr: () => WBS,      mapper: mapWbs,         key: 'id' },
-    scurve:        { arr: () => SCURVE,   mapper: mapScurve,      key: 'id' },
-  };
-
-  const cfg = tableMap[table];
-  if (!cfg) return;
-
-  const arr = cfg.arr();
-  const mapped = cfg.mapper(newRow);
-
-  if (eventType === 'INSERT') {
-    if (!arr.find(x => x[cfg.key] === mapped[cfg.key])) {
-      arr.push(mapped);
-    }
-  } else if (eventType === 'UPDATE') {
-    const idx = arr.findIndex(x => x[cfg.key] === mapped[cfg.key]);
-    if (idx >= 0) arr[idx] = { ...arr[idx], ...mapped };
-  } else if (eventType === 'DELETE') {
-    const idx = arr.findIndex(x => x[cfg.key] === oldRow[cfg.key]);
-    if (idx >= 0) arr.splice(idx, 1);
-  }
-
-  // Debounce render agar tidak flicker jika banyak event bersamaan
-  clearTimeout(_realtimeRenderTimer);
-  _realtimeRenderTimer = setTimeout(() => render(), 200);
-}
-let _realtimeRenderTimer = null;
-
-// ── 5. UPSERT HELPERS (ganti gsSync / syncAllGS) ─────────────
-
-/** Simpan/update satu project */
-async function sbSaveProject(proj) {
-  const row = unmapProject(proj);
-  const { error } = await (_initSb()).from('projects').upsert(row, { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Simpan/update project_history entries */
-async function sbSaveHistory(projId, historyArr) {
-  if (!historyArr?.length) return;
-  const rows = historyArr.map(h => ({
-    proj_id: projId,
-    date:    h.date,
-    actual:  h.actual,
-    plan:    h.plan,
-    mp:      h.mp || 0,
-    notes:   h.notes || '',
-    status:  h.status || null,
-  }));
-  const { error } = await (_initSb()).from('project_history')
-    .upsert(rows, { onConflict: 'proj_id,date', ignoreDuplicates: false });
-  if (error) console.warn('history upsert:', error.message);
-}
-
-/** Simpan issue */
-async function sbSaveIssue(iss) {
-  const { error } = await (_initSb()).from('issues').upsert(unmapIssue(iss), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Hapus issue */
-async function sbDeleteIssue(id) {
-  const { error } = await (_initSb()).from('issues').delete().eq('id', id);
-  if (error) throw error;
-}
-
-/** Simpan procurement */
-async function sbSaveProcurement(proc) {
-  const { error } = await (_initSb()).from('procurement').upsert(unmapProcurement(proc), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Simpan cost */
-async function sbSaveCost(cost) {
-  const { error } = await (_initSb()).from('costs').upsert(unmapCost(cost), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Soft-delete cost */
-async function sbDeleteCost(id) {
-  const { error } = await (_initSb()).from('costs').update({ _deleted: true }).eq('id', id);
-  if (error) throw error;
-}
-
-/** Simpan manpower log */
-async function sbSaveManpower(mp) {
-  const { error } = await (_initSb()).from('manpower_logs').upsert(unmapManpower(mp), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Simpan accident log */
-async function sbSaveAccident(acc) {
-  const { error } = await (_initSb()).from('accident_logs').upsert(unmapAccident(acc), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Simpan RAB (batch) */
-async function sbSaveRab(rabArr) {
-  if (!rabArr?.length) return;
-  const { error } = await (_initSb()).from('rab').upsert(rabArr.map(unmapRab), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Simpan WBS node */
-async function sbSaveWbs(node) {
-  const { error } = await (_initSb()).from('wbs').upsert(unmapWbs(node), { onConflict: 'id' });
-  if (error) throw error;
-}
-
-/** Simpan S-Curve entry */
-async function sbSaveScurve(entry) {
-  const { error } = await (_initSb()).from('scurve').upsert(unmapScurve(entry), { onConflict: 'proj_id,week' });
-  if (error) throw error;
-}
-
-// ── 6. PHOTOS ─────────────────────────────────────────────────
-
-/** Upload foto ke Supabase Storage */
-async function sbUploadPhoto(projId, file, caption = '') {
-  const ext = file.name.split('.').pop();
-  const path = `${projId}/${Date.now()}.${ext}`;
-
-  const { error: upErr } = await (_initSb()).storage
-    .from('project-photos')
-    .upload(path, file, { cacheControl: '3600', upsert: false });
-  if (upErr) throw upErr;
-
-  const { data: { publicUrl } } = (_initSb()).storage
-    .from('project-photos')
-    .getPublicUrl(path);
-
-  const { error: dbErr } = await (_initSb()).from('photos').insert({
-    id: genId(), proj_id: projId, url: publicUrl, caption
-  });
-  if (dbErr) throw dbErr;
-
-  return publicUrl;
-}
-
-/** Hapus foto */
-async function sbDeletePhoto(photoId, url) {
-  const path = url.split('/project-photos/')[1];
-  await (_initSb()).storage.from('project-photos').remove([path]);
-  await (_initSb()).from('photos').delete().eq('id', photoId);
-}
-
-// ── 7. PRESENCE (siapa sedang online/edit) ───────────────────
-
-let _presenceChannel = null;
-let _currentUser = null;
-
-async function sbInitPresence() {
-  const { data: { user } } = await (_initSb()).auth.getUser();
-  _currentUser = user;
-
-  const { data: profile } = await (_initSb()).from('user_profiles')
-    .select('full_name, role').eq('id', user.id).single();
-
-  _presenceChannel = (_initSb()).channel('presence-atw', {
-    config: { presence: { key: user.id } }
-  });
-
-  _presenceChannel
-    .on('presence', { event: 'sync' }, () => {
-      const state = _presenceChannel.presenceState();
-      _renderOnlineUsers(Object.values(state).flat());
-    })
-    .subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        await _presenceChannel.track({
-          userId:   user.id,
-          name:     profile?.full_name || user.email,
-          role:     profile?.role || 'viewer',
-          editingProjId: null,        // update saat user buka project
-        });
-      }
-    });
-}
-
-/** Update status "sedang edit project X" */
-async function sbSetEditing(projId) {
-  await _presenceChannel?.track({
-    userId: _currentUser?.id,
-    editingProjId: projId
-  });
-}
-
-/** Render badge user online di UI */
-function _renderOnlineUsers(users) {
-  const el = document.getElementById('online-users');
-  if (!el) return;
-  el.innerHTML = users.map(u =>
-    `<span class="online-badge" title="${u.name} (${u.role})"
-      style="background:var(--bl);color:#fff;padding:2px 8px;
-             border-radius:12px;font-size:11px;margin-right:4px">
-      ${u.name?.split(' ')[0] || 'User'}
-    </span>`
-  ).join('');
-}
-
-// ── 8. FIELD MAPPERS (Supabase snake_case ↔ Dashboard camelCase) ──
-
-function mapProject(r) {
-  return {
-    id: r.id, kode: r.kode, nama: r.nama, lokasi: r.lokasi,
-    client: r.client, mulai: r.mulai, selesai: r.selesai,
-    status: r.status, plan: r.plan, actual: r.actual,
-    mpPlan: r.mp_plan, mdPlan: r.mp_plan, mhPlan: r.mh_plan,
-    mpActual: r.mp_actual, weather: r.weather, notes: r.notes,
-    logo: r.logo, picPm: r.pic_pm, picSm: r.pic_sm,
-    picEng: r.pic_eng, picProc: r.pic_proc, history: []
-  };
-}
-function unmapProject(p) {
-  return {
-    id: p.id, kode: p.kode, nama: p.nama, lokasi: p.lokasi,
-    client: p.client, mulai: p.mulai || null, selesai: p.selesai || null,
-    status: p.status, plan: p.plan, actual: p.actual,
-    mp_plan: p.mpPlan || p.mdPlan || 0, mh_plan: p.mhPlan || 0,
-    mp_actual: p.mpActual || 0, weather: p.weather, notes: p.notes,
-    logo: p.logo, pic_pm: p.picPm, pic_sm: p.picSm,
-    pic_eng: p.picEng, pic_proc: p.picProc
-  };
-}
-
-function mapIssue(r) {
-  return {
-    id: r.id, projId: r.proj_id, tgl: r.tgl, uraian: r.uraian,
-    prioritas: r.prioritas, kategori: r.kategori, pj: r.pj,
-    due: r.due, status: r.status, done: r.done, action: r.action
-  };
-}
-function unmapIssue(i) {
-  return {
-    id: i.id, proj_id: i.projId, tgl: i.tgl || null,
-    uraian: i.uraian, prioritas: i.prioritas, kategori: i.kategori,
-    pj: i.pj, due: i.due || null, status: i.status,
-    done: i.done, action: i.action
-  };
-}
-
-function mapProcurement(r) {
-  return {
-    id: r.id, projId: r.proj_id, item: r.item, kategori: r.kategori,
-    qty: r.qty, satuan: r.satuan, due: r.due, supplier: r.supplier,
-    harga: r.harga, status: r.status, notes: r.notes,
-    rabKatId: r.rab_kat_id, rabItemId: r.rab_item_id
-  };
-}
-function unmapProcurement(p) {
-  return {
-    id: p.id, proj_id: p.projId, item: p.item, kategori: p.kategori,
-    qty: p.qty || 0, satuan: p.satuan, due: p.due || null,
-    supplier: p.supplier, harga: p.harga || 0, status: p.status,
-    notes: p.notes, rab_kat_id: p.rabKatId || null,
-    rab_item_id: p.rabItemId || null
-  };
-}
-
-function mapManpower(r) {
-  return {
-    id: r.id, projId: r.proj_id, date: r.date,
-    activities: r.activities || [], spv: r.spv, mandor: r.mandor,
-    installer: r.installer, tukang: r.tukang, helper: r.helper,
-    safety: r.safety, total: r.total
-  };
-}
-function unmapManpower(m) {
-  return {
-    id: m.id, proj_id: m.projId, date: m.date,
-    activities: m.activities || [],
-    spv: m.spv || 0, mandor: m.mandor || 0, installer: m.installer || 0,
-    tukang: m.tukang || 0, helper: m.helper || 0,
-    safety: m.safety || 0, total: m.total || 0
-  };
-}
-
-function mapAccident(r) {
-  return {
-    id: r.id, projId: r.proj_id, date: r.date,
-    fatality: r.fatality, lti: r.lti, minorInjury: r.minor_injury,
-    medTreatment: r.med_treatment, propertyDamage: r.property_damage,
-    fire: r.fire, traffic: r.traffic, environment: r.environment,
-    nearMiss: r.near_miss, timeLost: r.time_lost, notes: r.notes
-  };
-}
-function unmapAccident(a) {
-  return {
-    id: a.id, proj_id: a.projId, date: a.date,
-    fatality: a.fatality || 0, lti: a.lti || 0,
-    minor_injury: a.minorInjury || 0, med_treatment: a.medTreatment || 0,
-    property_damage: a.propertyDamage || 0, fire: a.fire || 0,
-    traffic: a.traffic || 0, environment: a.environment || 0,
-    near_miss: a.nearMiss || 0, time_lost: a.timeLost || 0, notes: a.notes
-  };
-}
-
-function mapCost(r) {
-  return {
-    id: r.id, projId: r.proj_id, date: r.date, type: r.type,
-    kategori: r.kategori, deskripsi: r.deskripsi, amount: r.amount,
-    paidBy: r.paid_by, notes: r.notes, ref: r.ref, status: r.status,
-    rabKatId: r.rab_kat_id, rabItemId: r.rab_item_id, _deleted: r._deleted
-  };
-}
-function unmapCost(c) {
-  return {
-    id: c.id, proj_id: c.projId, date: c.date, type: c.type,
-    kategori: c.kategori, deskripsi: c.deskripsi, amount: c.amount,
-    paid_by: c.paidBy, notes: c.notes, ref: c.ref, status: c.status,
-    rab_kat_id: c.rabKatId || null, rab_item_id: c.rabItemId || null,
-    _deleted: c._deleted || false
-  };
-}
-
-function mapRab(r) {
-  return {
-    id: r.id, projId: r.proj_id, type: r.type, katId: r.kat_id,
-    name: r.name, deskripsi: r.deskripsi, satuan: r.satuan,
-    volume: r.volume, hargaSatuan: r.harga_satuan, total: r.total,
-    notes: r.notes, urutan: r.urutan, isCustom: r.is_custom
-  };
-}
-function unmapRab(r) {
-  return {
-    id: r.id, proj_id: r.projId, type: r.type, kat_id: r.katId || null,
-    // Items (type='item') tidak punya field 'name' di JS — fallback ke deskripsi
-    name: (r.name || r.deskripsi || '').slice(0,200),
-    deskripsi: r.deskripsi || '', satuan: r.satuan || '',
-    volume: r.volume || 0, harga_satuan: r.hargaSatuan || 0,
-    notes: r.notes || '', urutan: r.urutan || 1, is_custom: r.isCustom !== false
-  };
-}
-
-function mapWbs(r) {
-  return {
-    id: r.id, projId: r.proj_id, type: r.type,
-    parentId: r.parent_id, name: r.name, bobot: r.bobot,
-    order: r.order, cumPlan: r.cum_plan, cumActual: r.cum_actual,
-    startDate: r.start_date, finishDate: r.finish_date,
-    weeklyData: r.weekly_data || {}, weeklyPlan: r.weekly_plan || {}
-  };
-}
-function unmapWbs(w) {
-  return {
-    id: w.id, proj_id: w.projId, type: w.type,
-    parent_id: w.parentId || null,
-    name: (w.name || '(unnamed)').slice(0, 200),  // NOT NULL guard
-    bobot: w.bobot || 0,
-    order: w.order || 0, cum_plan: w.cumPlan || 0, cum_actual: w.cumActual || 0,
-    start_date: w.startDate || null, finish_date: w.finishDate || null,
-    weekly_data: w.weeklyData || {}, weekly_plan: w.weeklyPlan || {}
-  };
-}
-
-function mapScurve(r) {
-  return {
-    id: r.id, projId: r.proj_id, week: r.week,
-    wPlan: r.w_plan, wAct: r.w_act,
-    cPlan: r.c_plan, cAct: r.c_act, dateStart: r.date_start
-  };
-}
-function unmapScurve(s) {
-  return {
-    proj_id: s.projId, week: s.week,
-    w_plan: s.wPlan, w_act: s.wAct,
-    c_plan: s.cPlan, c_act: s.cAct, date_start: s.dateStart
-  };
-}
-
-// ── 9. MIGRATION HELPER — import dari GSheet JSON ────────────
-//  Panggil sekali dari console browser setelah login admin:
-//  await migrateFromGSheet(window._gsExportData);
-
-async function migrateFromGSheet(gsData) {
-  console.log('🚀 Starting migration from GSheet data...');
-  const errors = [];
-
-  // Projects
-  for (const p of gsData.projects || []) {
-    try {
-      await sbSaveProject(p);
-      await sbSaveHistory(p.id, p.history || []);
-    } catch (e) { errors.push(`project ${p.id}: ${e.message}`); }
-  }
-  console.log(`✓ Projects: ${gsData.projects?.length || 0}`);
-
-  // Issues
-  for (const x of gsData.issues || []) {
-    try { await sbSaveIssue(x); } catch (e) { errors.push(`issue ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ Issues: ${gsData.issues?.length || 0}`);
-
-  // Procurement
-  for (const x of gsData.procurement || []) {
-    try { await sbSaveProcurement(x); } catch (e) { errors.push(`proc ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ Procurement: ${gsData.procurement?.length || 0}`);
-
-  // Manpower
-  for (const x of gsData.manpowerLogs || []) {
-    try { await sbSaveManpower(x); } catch (e) { errors.push(`mp ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ Manpower: ${gsData.manpowerLogs?.length || 0}`);
-
-  // Accidents
-  for (const x of gsData.accidentLogs || []) {
-    try { await sbSaveAccident(x); } catch (e) { errors.push(`acc ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ Accidents: ${gsData.accidentLogs?.length || 0}`);
-
-  // Costs
-  for (const x of gsData.costs || []) {
-    try { await sbSaveCost(x); } catch (e) { errors.push(`cost ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ Costs: ${gsData.costs?.length || 0}`);
-
-  // RAB (batch)
-  try { await sbSaveRab(gsData.rab || []); }
-  catch (e) { errors.push(`rab: ${e.message}`); }
-  console.log(`✓ RAB: ${gsData.rab?.length || 0}`);
-
-  // WBS
-  for (const x of gsData.wbs || []) {
-    try { await sbSaveWbs(x); } catch (e) { errors.push(`wbs ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ WBS: ${gsData.wbs?.length || 0}`);
-
-  // S-Curve
-  for (const x of gsData.scurve || []) {
-    try { await sbSaveScurve(x); } catch (e) { errors.push(`scurve ${x.id}: ${e.message}`); }
-  }
-  console.log(`✓ S-Curve: ${gsData.scurve?.length || 0}`);
-
-  if (errors.length) {
-    console.warn('⚠ Errors during migration:', errors);
-  } else {
-    console.log('🎉 Migration complete — no errors!');
-  }
-  return errors;
-}
 
 const _DEFAULT_GS_SHEET='1XeECJqg-yqxitUUAVva-r6oD5-1ETptaolu9H9m_mCs';
 try{const c=JSON.parse(localStorage.getItem('atw_gs')||'{}');gsUrl=c.url||_DEFAULT_GS_URL;gsSheet=c.sheet||_DEFAULT_GS_SHEET;if(gsUrl)gsOk=true;}catch(e){}
@@ -6586,11 +5972,553 @@ function exportRabCSV(){
 }
 
 // Patch renderCost to also trigger renderRab
-
 const _origRenderCost=typeof renderCost==='function'?renderCost:null;
 
-// Utility: parse date string to local Date object
+const GS_SCRIPT=`// ATW Solar Dashboard \u2014 Google Apps Script v10 (Multi-User Safe \u2014 Full Merge + RAB)
+// Deploy sebagai Web App: Execute as Me, Anyone can access
+
+const SHEET_ID = '${gsSheet||"GANTI_DENGAN_ID_GOOGLE_SHEET_ANDA"}';
+
+function getSpreadsheet() {
+  try {
+    if (SHEET_ID && SHEET_ID.length > 10) return SpreadsheetApp.openById(SHEET_ID);
+  } catch(e) {}
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function doOptions(e) {
+  return ContentService.createTextOutput('ok').setMimeType(ContentService.MimeType.TEXT);
+}
+
+function doPost(e) {
+  // LockService \u2014 prevent concurrent writes
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(8000); // wait max 8s
+  } catch(err) {
+    return makeOutput({status:'error', msg:'Server busy, coba lagi'});
+  }
+  try {
+    const d = JSON.parse(e.postData.contents || '{}');
+    const ss = getSpreadsheet();
+
+    if (d.action === 'updatePw' || d.action === 'updateConfig') {
+      let sh = ss.getSheetByName('_CONFIG') || ss.insertSheet('_CONFIG');
+      // Read existing config first to preserve fields not being updated
+      const existing = {};
+      if (sh.getLastRow() >= 2) {
+        sh.getDataRange().getValues().slice(1).forEach(r => {
+          if (r[0]) existing[String(r[0]).trim()] = String(r[1]||'');
+        });
+      }
+      // Merge incoming fields
+      if (d.pw_admin  !== undefined) existing['pw_admin']  = String(d.pw_admin  || 'admin123');
+      if (d.pw_editor !== undefined) existing['pw_editor'] = String(d.pw_editor || 'edit123');
+      if (d.dash_logo !== undefined) existing['dash_logo'] = String(d.dash_logo || '');
+      // Rewrite sheet
+      sh.clearContents();
+      sh.appendRow(['key', 'value']);
+      Object.entries(existing).forEach(([k,v]) => sh.appendRow([k, v]));
+      lock.releaseLock();
+      return makeOutput({status:'ok'});
+    }
+
+    if (d.action === 'sync') {
+      const meta = ss.getSheetByName('_META');
+      const currentTs = meta && meta.getLastRow() >= 2 ? +meta.getRange(2,1).getValue() : 0;
+      const incomingTs = d.lastSaved || 0;
+
+      // Conflict check \u2014 if server newer, return server data for merge
+      if (incomingTs < currentTs - 2000) {
+        lock.releaseLock();
+        return makeOutput({
+          status: 'conflict',
+          currentTs,
+          incomingTs,
+          msg: 'Data di server lebih baru. Merge dilakukan otomatis.'
+        });
+      }
+
+      // Merge all collections by id (never delete, only add/update)
+      const mergeById = (existing, incoming, allowDelete=false) => {
+        const map = new Map();
+        (existing||[]).forEach(r => { if(r.id) map.set(String(r.id), r); });
+        (incoming||[]).forEach(r => { if(r.id) map.set(String(r.id), r); });
+        if(allowDelete) return [...map.values()].filter(r => !r._deleted);
+        return [...map.values()];
+      };
+
+      const existingProj = readSheet(ss,'PROJECTS')    || [];
+      const existingProc = readSheet(ss,'PROCUREMENT') || [];
+      const existingIss  = readSheet(ss,'ISSUES')      || [];
+      const existingMp   = readSheet(ss,'MANPOWER_LOG')|| [];
+      const existingAcc  = readSheet(ss,'ACCIDENT_LOG')|| [];
+      const existingWbs  = readSheet(ss,'WBS')         || [];
+
+      // Merge HISTORY by projId+date composite key (no id field)
+      const existingHist = readSheet(ss,'HISTORY') || [];
+      const histMap = new Map();
+      existingHist.forEach(h => { const k=String(h.projId||'')+'|'+String(h.date||''); histMap.set(k, h); });
+      (d.history||[]).forEach(h => { const k=String(h.projId||'')+'|'+String(h.date||''); histMap.set(k, h); });
+      const mergedHist = [...histMap.values()];
+
+      writeSheet(ss,'PROJECTS',   mergeById(existingProj, d.projects||[]),    ['id','kode','nama','lokasi','client','mulai','selesai','status','plan','actual','mdPlan','mpPlan','mpActual','mhPlan','weather','notes','logo','picPm','picSm','picEng','picProc']);
+      writeSheet(ss,'HISTORY',    mergedHist,     ['projId','kode','date','actual','plan','mp','notes']);
+      writeSheet(ss,'ISSUES',     mergeById(existingIss,  d.issues||[], true),      ['id','projId','tgl','uraian','prioritas','kategori','pj','due','status','done','action']);
+      writeSheet(ss,'PROCUREMENT',mergeById(existingProc, d.procurement||[], true), ['id','projId','item','kategori','qty','satuan','supplier','due','status','notes','harga','rabKatId','rabItemId']);
+      writeSheet(ss,'MANPOWER_LOG',mergeById(existingMp,  d.manpowerLogs||[], true),['id','projId','date','spv','mandor','installer','tukang','helper','safety','total','mhActual','timeLost','timeLostReason','notes']);
+      writeSheet(ss,'ACCIDENT_LOG',mergeById(existingAcc, d.accidentLogs||[], true),['id','projId','date','fatality','lti','minorInjury','medTreatment','propertyDamage','fire','traffic','environment','nearMiss','timeLost','notes']);
+      writeSheet(ss,'SCURVE',d.scurve||[],['projId','week','wPlan','wAct','cPlan','cAct','dateStart','fromWbs']);
+      writeSheet(ss,'WBS',mergeById(existingWbs,d.wbs||[]),['id','projId','type','parentId','name','bobot','order','cumPlan','cumActual','weeklyData','weeklyPlan','startDate','finishDate','dailyLogs','qtyPlan','qtySatuan']);
+      // COSTS (OPEX)
+      const existingCosts=readSheet(ss,'COSTS')||[];
+      writeSheet(ss,'COSTS',mergeById(existingCosts,d.costs||[]),['id','projId','date','type','kategori','deskripsi','amount','paidBy','notes','ref','status','rabKatId','rabItemId']);
+      // RAB (Rencana Anggaran Biaya)
+      const existingRab=readSheet(ss,'RAB')||[];
+      writeSheet(ss,'RAB',mergeById(existingRab,d.rab||[]),['id','projId','type','katId','name','deskripsi','satuan','volume','hargaSatuan','total','notes','urutan','isCustom','procKat']);
+
+      const now = Date.now();
+      let ms = ss.getSheetByName('_META') || ss.insertSheet('_META');
+      ms.clearContents();
+      ms.appendRow(['lastSaved','version','lastUser']);
+      ms.appendRow([now, '10.0', d.user||'unknown']);
+
+      lock.releaseLock();
+      return makeOutput({status:'ok', ts: new Date().toISOString(), serverTs: now});
+    }
+
+    lock.releaseLock();
+    return makeOutput({status:'error', msg:'Unknown action'});
+  } catch(err) {
+    try { lock.releaseLock(); } catch(e) {}
+    return makeOutput({status:'error', msg: err.message});
+  }
+}
+
+function doGet(e) {
+  try {
+    const ss = getSpreadsheet();
+    let pw_admin = 'admin123', pw_editor = 'edit123', dash_logo = '';
+    const cfg = ss.getSheetByName('_CONFIG');
+    if (cfg && cfg.getLastRow() >= 2) {
+      cfg.getDataRange().getValues().slice(1).forEach(r => {
+        if (String(r[0]).trim() === 'pw_admin')  pw_admin  = String(r[1]).trim();
+        if (String(r[0]).trim() === 'pw_editor') pw_editor = String(r[1]).trim();
+        if (String(r[0]).trim() === 'dash_logo') dash_logo = String(r[1]).trim();
+      });
+    }
+    const meta = readSheet(ss,'_META');
+    return makeOutput({
+      lastSaved:    meta.length ? (+meta[0].lastSaved||0) : 0,
+      pw_admin, pw_editor, dash_logo,
+      projects:     readSheet(ss,'PROJECTS')    ||[],
+      history:      readSheet(ss,'HISTORY')     ||[],
+      issues:       readSheet(ss,'ISSUES')      ||[],
+      procurement:  readSheet(ss,'PROCUREMENT') ||[],
+      manpowerLogs: readSheet(ss,'MANPOWER_LOG')||[],
+      accidentLogs: readSheet(ss,'ACCIDENT_LOG')||[],
+      costs:        readSheet(ss,'COSTS')||[],
+      scurve:       readSheet(ss,'SCURVE')       ||[],
+      wbs:          readSheet(ss,'WBS')           ||[],
+      rab:          readSheet(ss,'RAB')           ||[],
+    });
+  } catch(err) {
+    return makeOutput({status:'error', msg: err.message});
+  }
+}
+
+function writeSheet(ss, name, data, cols) {
+  const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clearContents();
+  sh.appendRow(cols);
+  const dateFields = ['startDate','finishDate','date','mulai','selesai','due'];
+  if (data.length > 0) {
+    const idFields = ['id','projId','parentId','katId'];
+    const rows = data.map(row => cols.map(c => {
+      const v = row[c];
+      if (v === null || v === undefined) return '';
+      if (typeof v === 'object') return JSON.stringify(v);
+      if (dateFields.includes(c) && typeof v === 'string' && v.length >= 10)
+        return "'" + String(v).slice(0,10);
+      if (idFields.includes(c) && String(v) !== '') return "'" + String(v);
+      return v;
+    }));
+    sh.getRange(2, 1, rows.length, cols.length).setValues(rows);
+  }
+}
+
+function readSheet(ss, name) {
+  const sh = ss.getSheetByName(name);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const [headers, ...rows] = sh.getDataRange().getValues();
+  const dateFields = ['due','date','mulai','selesai','startDate','finishDate'];
+  return rows.map(r => {
+    const obj = Object.fromEntries(headers.map((k,i) => [k, r[i]]));
+    ['weeklyData','weeklyPlan','dailyLogs','history'].forEach(field => {
+      if (obj[field] && typeof obj[field] === 'string' &&
+          (obj[field].startsWith('{') || obj[field].startsWith('['))) {
+        try { obj[field] = JSON.parse(obj[field]); } catch(e) {}
+      }
+    });
+    dateFields.forEach(field => {
+      if (obj[field]) {
+        const s = String(obj[field]).trim();
+        if (s.includes('T')) obj[field] = s.slice(0,10);
+        else if (s.startsWith("'")) obj[field] = s.slice(1,11);
+      }
+    });
+    ['id','projId','parentId','katId'].forEach(field => {
+      if (obj[field] && typeof obj[field] === 'string' && obj[field].startsWith("'"))
+        obj[field] = obj[field].slice(1);
+    });
+    return obj;
+  });
+}
+
+function makeOutput(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
+function saveGS(){
+  gsUrl=gv('gsScriptUrl').trim();gsSheet=gv('gsSheetUrl').trim();
+  if(!gsUrl){toast('URL Script wajib diisi','error');return;}
+  gsOk=true;
+  localStorage.setItem('atw_gs',JSON.stringify({url:gsUrl,sheet:gsSheet}));
+  updateGsBadge();cm('gsConfig');
+  // Load password dari GSheet setelah tersambung
+  loadPwFromGS().then(()=>toast('✓ Google Sheet tersambung & password disinkronisasi'));
+  if(P.length)gsSync();
+}
+async function testGS(){
+  const url=gv('gsScriptUrl').trim();
+  if(!url){toast('Isi URL dulu','error');return;}
+  if(!url.includes('script.google.com/macros/s/')){
+    _gsTestShow('error','✗ URL tidak valid.\nHarus berformat: https://script.google.com/macros/s/XXX/exec');return;
+  }
+  _gsTestShow('loading','<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Menghubungi Apps Script...');
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),12000);
+  try{
+    const r=await fetch(url+'?t='+Date.now(),{cache:'no-store',signal:controller.signal});
+    clearTimeout(timer);
+    const txt=await r.text();
+    let diag='';
+    try{
+      const d=JSON.parse(txt);
+      if(d.status==='error'){
+        _gsTestShow('error','✗ Apps Script error: '+d.msg+'\n→ Cek SHEET_ID di Apps Script sudah benar?');return;
+      }
+      const projCount=(d.projects||[]).length;
+      diag='✓ Terhubung! '+projCount+' project ditemukan.';
+      if(d.lastSaved&&d.lastSaved>0)diag+='\nSync terakhir: '+new Date(d.lastSaved).toLocaleString('id-ID');
+      _gsTestShow('ok',diag);
+    }catch(je){
+      if(txt.includes('Execution failed')||txt.includes('Script function')){
+        _gsTestShow('error','✗ Apps Script gagal dijalankan. Cek:\n1. Script sudah di-deploy sebagai Web App?\n2. Execute as: Me | Access: Anyone?\n3. SHEET_ID sudah benar?');
+      }else if(txt.includes('<!DOCTYPE')){
+        _gsTestShow('warn','⚠ Apps Script mengembalikan HTML bukan JSON.\nKemungkinan belum di-deploy atau deployment kadaluarsa.\nBuat New Deployment ulang.');
+      }else{
+        _gsTestShow('warn','⚠ Response tidak dikenali (bukan JSON).\nTeks: '+txt.slice(0,120));
+      }
+    }
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError'){
+      _gsTestShow('error','✗ Timeout (12 detik).\nApps Script terlalu lambat atau tidak merespons.');
+    }else{
+      _gsTestShow('error','✗ Tidak dapat terhubung: '+e.message+'\n→ Cek URL sudah benar dan Apps Script sudah di-deploy.');
+    }
+  }
+}
+function _gsTestShow(type,msg){
+  const r=$('gsTestRes');if(!r)return;
+  r.style.display='block';r.style.whiteSpace='pre-line';r.style.lineHeight='1.6';
+  const styles={
+    ok:    {bg:'rgba(16,185,129,.1)',bd:'var(--gn)',cl:'var(--gn)'},
+    warn:  {bg:'rgba(245,158,11,.1)',bd:'var(--yw)',cl:'var(--yw)'},
+    error: {bg:'rgba(239,68,68,.1)', bd:'var(--rd)',cl:'var(--rd)'},
+    loading:{bg:'rgba(100,116,139,.1)',bd:'var(--bd)',cl:'var(--mt)'}
+  };
+  const s=styles[type]||styles.loading;
+  r.style.background=s.bg;r.style.border='1px solid '+s.bd;r.style.color=s.cl;
+  r.textContent=msg;
+}
+function _gsUrlHint(val){
+  const h=$('gsUrlHint');if(!h)return;
+  if(!val){h.textContent='';return;}
+  if(!val.startsWith('https://script.google.com/macros/s/')){
+    h.style.color='var(--rd)';h.textContent='✗ URL harus diawali: https://script.google.com/macros/s/';
+  }else if(!val.endsWith('/exec')){
+    h.style.color='var(--yw)';h.textContent='⚠ URL harus diakhiri /exec';
+  }else{
+    h.style.color='var(--gn)';h.textContent='✓ Format URL valid';
+  }
+}
+function copyGsScript(){
+  navigator.clipboard?.writeText(GS_SCRIPT).then(()=>toast('Script disalin ✓')).catch(()=>{
+    const t=document.createElement('textarea');t.value=GS_SCRIPT;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);toast('Script disalin ✓');
+  });
+}
+
+function getPendingDeletes(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_proc')||'[]'));}catch(e){return new Set();}}
+function addPendingDelete(id){const ids=getPendingDeletes();ids.add(String(id));try{localStorage.setItem('atw_deleted_proc',JSON.stringify([...ids]));}catch(e){}}
+function clearPendingDeletes(){try{localStorage.removeItem('atw_deleted_proc');}catch(e){}}
+function getPendingDeletesWbs(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_wbs')||'[]'));}catch(e){return new Set();}}
+function addPendingDeleteWbs(id){const ids=getPendingDeletesWbs();ids.add(String(id));try{localStorage.setItem('atw_deleted_wbs',JSON.stringify([...ids]));}catch(e){}}
+function clearPendingDeletesWbs(){try{localStorage.removeItem('atw_deleted_wbs');}catch(e){}}
+function getPendingDeletesIss(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_iss')||'[]'));}catch(e){return new Set();}}
+function addPendingDeleteIss(id){const s=getPendingDeletesIss();s.add(String(id));try{localStorage.setItem('atw_deleted_iss',JSON.stringify([...s]));}catch(e){}}
+function clearPendingDeletesIss(){try{localStorage.removeItem('atw_deleted_iss');}catch(e){}}
+function getPendingDeletesMp(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_mp')||'[]'));}catch(e){return new Set();}}
+function addPendingDeleteMp(id){const s=getPendingDeletesMp();s.add(String(id));try{localStorage.setItem('atw_deleted_mp',JSON.stringify([...s]));}catch(e){}}
+function clearPendingDeletesMp(){try{localStorage.removeItem('atw_deleted_mp');}catch(e){}}
+function getPendingDeletesAcc(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_acc')||'[]'));}catch(e){return new Set();}}
+function addPendingDeleteAcc(id){const s=getPendingDeletesAcc();s.add(String(id));try{localStorage.setItem('atw_deleted_acc',JSON.stringify([...s]));}catch(e){}}
+function clearPendingDeletesAcc(){try{localStorage.removeItem('atw_deleted_acc');}catch(e){}}
+function getPendingDeletesCost(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_cost')||'[]'));}catch(e){return new Set();}}
+function addPendingDeleteCost(id){const s=getPendingDeletesCost();s.add(String(id));try{localStorage.setItem('atw_deleted_cost',JSON.stringify([...s]));}catch(e){}}
+function clearPendingDeletesCost(){try{localStorage.removeItem('atw_deleted_cost');}catch(e){}}
+function getPendingDeletesRab(){try{return new Set(JSON.parse(localStorage.getItem('atw_deleted_rab')||'[]'));}catch(e){return new Set();}}
+function addPendingDeleteRab(id){const s=getPendingDeletesRab();s.add(String(id));try{localStorage.setItem('atw_deleted_rab',JSON.stringify([...s]));}catch(e){}}
+function clearPendingDeletesRab(){try{localStorage.removeItem('atw_deleted_rab');}catch(e){}}
+function genId(){return String(Date.now())+Math.random().toString(36).slice(2,6);}
 function parseLocalDate(s){if(!s)return null;const str=String(s).slice(0,10);const parts=str.split('-');if(parts.length!==3)return new Date(s);const d=new Date(+parts[0],+parts[1]-1,+parts[2],0,0,0,0);return isNaN(d)?null:d;}
+function _numPrefix(id){const s=String(id||'');const m=s.match(/^(\d+)/);return m?m[1]:s;}
+function _idMatch(a,b){if(String(a)===String(b))return true;const na=_numPrefix(a),nb=_numPrefix(b);return na&&nb&&na===nb;}
+function _updateCostKatList(projId){
+  const dl=$('cKatList');if(!dl)return;
+  const defaults=['Transportasi','Konsumsi / Makan','Sewa Alat','Sewa Kendaraan','Akomodasi','ATK / Perlengkapan Kantor','Komunikasi','Keselamatan / K3','Listrik / Air','Lainnya'];
+  const rabKats=RAB.filter(r=>r.type==='kat'&&(String(r.projId)===String(projId)||_idMatch(r.projId,projId))).map(r=>r.name).filter(Boolean);
+  const allKats=[...new Set([...rabKats,...defaults])];
+  dl.innerHTML=allKats.map(k=>'<option value="'+safeStr(k)+'">').join('');
+}
+// Sync dengan COSTS custom (dipakai oleh delCost untuk kirim snapshot sebelum filter)
+async function _gsSyncWithCosts(costsArr){
+  if(!gsOk||!gsUrl)return;
+  try{
+    const hist=[];P.forEach(p=>(p.history||[]).forEach(h=>hist.push({...h,projId:p.id,kode:p.kode})));
+    const lTs=JSON.parse(localStorage.getItem('atw_data')||'{}').ts||Date.now();
+    const user=localStorage.getItem('atw_user')||'user';
+    const body=JSON.stringify({action:'sync',lastSaved:lTs,user,projects:P,history:hist,
+      issues:ISS,procurement:PROC,manpowerLogs:MPLOGS,accidentLogs:ACCLOGS,
+      scurve:SCURVE,wbs:WBS,costs:costsArr,rab:RAB});
+    const r=await fetch(gsUrl,{method:'POST',body,headers:{'Content-Type':'text/plain;charset=utf-8'}});
+    if(r.ok){
+      const d=JSON.parse(await r.text());
+      if(d.status==='ok'){
+        clearPendingDeletesCost();
+        console.log('GS delete sync OK');
+      }
+    }
+  }catch(e){console.warn('GS delete sync failed:',e.message);}
+}
+
+function gsSync(){
+  if(!gsOk||!gsUrl)return;
+  // Debounce \u2014 jangan sync terlalu sering
+  if(gsSync._pending)clearTimeout(gsSync._pending);
+  gsSync._pending=setTimeout(async()=>{
+    gsSync._pending=null;
+    try{
+      const hist=[];P.forEach(p=>(p.history||[]).forEach(h=>hist.push({...h,projId:p.id,kode:p.kode})));
+      const user=localStorage.getItem('atw_user')||'user';
+      // Gunakan ts dari localStorage (waktu data terakhir diubah lokal), bukan Date.now()
+      // Ini penting agar conflict detection di server bisa bekerja dengan benar
+      const lTs=JSON.parse(localStorage.getItem('atw_data')||'{}').ts||Date.now();
+      // Sertakan soft-deleted cost records agar GSheet bisa hapus via mergeById(allowDelete)
+      const pendingCostDels=[...getPendingDeletesCost()];
+      const costsWithDeleted=[...COSTS,...pendingCostDels.filter(id=>!COSTS.find(c=>String(c.id)===id)).map(id=>({id,_deleted:true}))];
+      const body=JSON.stringify({action:'sync',lastSaved:lTs,user,projects:P,history:hist,issues:ISS,procurement:PROC,manpowerLogs:MPLOGS,accidentLogs:ACCLOGS,scurve:SCURVE,wbs:WBS,costs:costsWithDeleted,rab:RAB});
+      const r=await fetch(gsUrl,{method:'POST',body,headers:{'Content-Type':'text/plain;charset=utf-8'}});
+      if(r.ok){
+        const txt=await r.text();
+        try{
+          const d=JSON.parse(txt);
+          if(d.status==='ok'){
+            console.log('GS sync OK',d.ts);
+            clearPendingDeletesCost(); // bersihkan setelah berhasil sync
+          }else if(d.status==='conflict'){
+            // Server lebih baru \u2014 load ulang dari GSheet lalu sync lagi
+            console.warn('GS conflict detected, reloading...');
+            await loadFromGS();
+          }else if(d.status==='error'&&d.msg==='Server busy, coba lagi'){
+            // Retry after 3s
+            setTimeout(()=>gsSync(),3000);
+          }
+        }catch(e){}
+      }
+    }catch(e){
+      try{
+        const hist=[];P.forEach(p=>(p.history||[]).forEach(h=>hist.push({...h,projId:p.id,kode:p.kode})));
+        fetch(gsUrl,{method:'POST',body:JSON.stringify({action:'sync',lastSaved:Date.now(),projects:P,history:hist,issues:ISS,procurement:PROC,manpowerLogs:MPLOGS,accidentLogs:ACCLOGS,scurve:SCURVE,wbs:WBS,costs:COSTS}),headers:{'Content-Type':'text/plain'},mode:'no-cors'});
+      }catch(e2){}
+    }
+  },800); // debounce 800ms
+}
+async function syncAllGS(){
+  if(!gsOk||!gsUrl){toast('Google Sheet belum tersambung','warn');return;}
+  const btn=$('btnSync');
+  if(btn){btn.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Mengirim...';btn.disabled=true;}
+  try{
+    const hist=[];P.forEach(p=>(p.history||[]).forEach(h=>hist.push({...h,projId:p.id,kode:p.kode})));
+    // Gunakan timestamp dari localStorage sebagai lastSaved
+    const lTs=JSON.parse(localStorage.getItem('atw_data')||'{}').ts||Date.now();
+    const body=JSON.stringify({action:'sync',lastSaved:lTs,projects:P,history:hist,issues:ISS,procurement:PROC,manpowerLogs:MPLOGS,accidentLogs:ACCLOGS,scurve:SCURVE,wbs:WBS,costs:COSTS,rab:RAB});
+    const r=await fetch(gsUrl,{method:'POST',body,headers:{'Content-Type':'text/plain;charset=utf-8'}});
+    if(r.ok){
+      const txt=await r.text();
+      try{
+        const d=JSON.parse(txt);
+        if(d.status==='ok'){
+          toast('✓ Data tersimpan di Google Sheet!');
+          $('smsg').textContent='Tersinkronisasi · '+new Date().toLocaleTimeString('id-ID');
+          $('sdot').style.background='var(--gn)';$('sdot').classList.remove('unsaved');
+          isDirty=false;$('sbar').classList.remove('dirty');
+        }else if(d.status==='rejected'){
+          // GSheet punya data lebih baru \u2014 harus load dulu
+          toast('⚠ GSheet punya data lebih baru! Klik ↓ Load GSheet dulu, lalu sync ulang.','warn');
+          $('smsg').textContent='⚠ Conflict: GSheet lebih baru \u2014 klik Load GSheet';
+          // Tawari untuk auto-load
+          if(confirm('Google Sheet punya data yang lebih baru.\n\nLoad data dari GSheet sekarang? (data lokal akan digabung)')){
+            await loadFromGS();
+          }
+        }else{
+          toast('⚠ GSheet: '+(d.msg||'unknown error'),'warn');
+        }
+      }catch(pe){
+        toast('Data dikirim (no-cors mode \u2014 tidak bisa verifikasi)','warn');
+      }
+    }else{
+      throw new Error('HTTP '+r.status);
+    }
+  }catch(e){
+    try{
+      const hist=[];P.forEach(p=>(p.history||[]).forEach(h=>hist.push({...h,projId:p.id,kode:p.kode})));
+      const lTs=JSON.parse(localStorage.getItem('atw_data')||'{}').ts||Date.now();
+      await fetch(gsUrl,{method:'POST',body:JSON.stringify({action:'sync',lastSaved:lTs,projects:P,history:hist,issues:ISS,procurement:PROC,manpowerLogs:MPLOGS,accidentLogs:ACCLOGS,costs:COSTS}),headers:{'Content-Type':'text/plain'},mode:'no-cors'});
+      toast('Data dikirim (no-cors). Minta tim lain klik Load GSheet untuk update.','warn');
+    }catch(e2){
+      toast('✗ Gagal sync: '+e.message,'error');
+    }
+  }finally{
+    if(btn){btn.textContent='↑ Sync GSheet';btn.disabled=false;}
+  }
+}
+async function loadFromGS(){
+  if(!gsOk||!gsUrl){toast('Google Sheet belum tersambung','warn');return;}
+  $('smsg').innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg> Memuat dari Google Sheet...';
+  $('sdot').style.background='var(--yw)';
+  try{
+    const r=await fetch(gsUrl+'?t='+Date.now(),{cache:'no-cache'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const txt=await r.text();
+    if(!txt||!txt.trim().startsWith('{'))throw new Error('Response bukan JSON valid');
+    const d=JSON.parse(txt);
+    if(d.status==='error')throw new Error(d.msg);
+    if(d.projects&&d.projects.length>0){
+      // Simpan logo dari data lokal sebelum ditimpa GSheet
+      const localLogos={};
+      P.forEach(p=>{if(p.logo)localLogos[p.id]=p.logo;});
+      // Coba ambil logo dari localStorage cache terpisah
+      try{const lc=JSON.parse(localStorage.getItem('atw_logos')||'{}');Object.assign(localLogos,lc);}catch(e){}
+
+      P=sanitizeProjects(d.projects);
+      P.forEach(p=>{
+        const lv=localLogos[p.id]||localLogos[String(p.id)]||'';
+        if(!p.logo&&lv)p.logo=lv;
+      });
+      ISS=sanitizeIssues(d.issues);
+      // Merge procurement: GSheet + lokal, tidak hapus data yang tidak ada di lokal
+      const remoteProc=sanitizeProc(d.procurement);
+      const procMergeMap=new Map();
+      PROC.forEach(p=>procMergeMap.set(String(p.id),p));
+      remoteProc.forEach(p=>procMergeMap.set(String(p.id),p));
+      PROC=[...procMergeMap.values()];
+      MPLOGS=sanitizeMpLogs(d.manpowerLogs);
+      ACCLOGS=sanitizeAccLogs(d.accidentLogs);COSTS=sanitizeCosts(d.costs||[]);
+      RAB=sanitizeRab(d.rab||[]);
+      SCURVE=Array.isArray(d.scurve)?d.scurve.map(s=>({projId:s.projId,week:+s.week||0,wPlan:+s.wPlan||0,wAct:+s.wAct||0,cPlan:s.cPlan!=null&&s.cPlan!==''?+s.cPlan:null,cAct:s.cAct!=null&&s.cAct!==''?+s.cAct:null,dateStart:safeStr(s.dateStart),fromWbs:s.fromWbs===true||s.fromWbs==='true'||s.fromWbs===1})):[];
+      const parseField=v=>{
+        if(!v||v==='[object Object]'||v==='null')return {};
+        if(typeof v==='object')return v;
+        try{return JSON.parse(v);}catch(e){return {};}
+      };
+      const parseArr=v=>{
+        if(!v||v==='[object Object]')return [];
+        if(Array.isArray(v))return v;
+        try{const p=JSON.parse(v);return Array.isArray(p)?p:[];}catch(e){return [];}
+      };
+      // GSheet returns dates as "2026-04-22T00:00:00.000Z" \u2014 trim to YYYY-MM-DD
+      const parseDate=v=>{
+        if(!v)return '';
+        const s=String(v);
+        if(s.includes('T'))return s.slice(0,10);
+        return s.trim();
+      };
+      WBS=Array.isArray(d.wbs)?d.wbs.map(w=>({
+        ...w,
+        bobot:+w.bobot||0,
+        cumActual:+w.cumActual||0,
+        cumPlan:+w.cumPlan||0,
+        weeklyData:parseField(w.weeklyData),
+        weeklyPlan:parseField(w.weeklyPlan),
+        dailyLogs:parseArr(w.dailyLogs),
+        qtyPlan:w.qtyPlan!=null&&w.qtyPlan!==''?+w.qtyPlan:null,
+        qtySatuan:w.qtySatuan||'',
+        startDate:parseDate(w.startDate),
+        finishDate:parseDate(w.finishDate)
+      })):[];
+
+      // Deduplicate WBS by id \u2014 keep last occurrence (most recent sync)
+      const wbsMap=new Map();
+      WBS.forEach(w=>wbsMap.set(String(w.id),w));
+      WBS=[...wbsMap.values()];
+
+      // Normalize all IDs to strings for consistent comparison
+      const _toId=v=>{if(v==null||v==='')return '';if(typeof v==='object'){const s=JSON.stringify(v);return s.replace(/[^0-9]/g,'').slice(0,16)||'';}return String(v);};
+      WBS=WBS.map(w=>({...w,
+        id:_toId(w.id)||String(Date.now()+Math.random()),
+        projId:_toId(w.projId),
+        parentId:w.parentId!=null&&w.parentId!==''?_toId(w.parentId):null
+      }));
+
+      // Match WBS projId to actual project IDs (handle numeric vs string mismatch)
+      if(WBS.length&&P.length){
+        const validProjIds=new Set(P.map(p=>p.id));
+        WBS=WBS.map(w=>{
+          if(validProjIds.has(w.projId))return w;
+          const match=P.find(p=>+p.id===+w.projId);
+          if(match){
+return{...w,projId:match.id};}
+          return w;
+        });
+      }
+      syncAllWbsToProjects();
+      if(d.history){d.history.forEach(h=>{const p=P.find(x=>x.id==h.projId);if(p){if(!p.history)p.history=[];p.history.push(h);}});}
+      selId=P[0]?.id||null;
+      saveLocal(Date.now(),true);saveLogosCache(); // data dari GSheet
+      // Apply dash_logo dari GSheet jika ada dan belum ada di localStorage
+      if(d.dash_logo&&d.dash_logo.startsWith('data:')){
+        try{
+          localStorage.setItem('atw_dash_logo',d.dash_logo);
+          const img=$('dashLogoImg');if(img)img.src=d.dash_logo;
+          const btn=$('btnResetLogo');if(btn)btn.style.display='flex';
+        }catch(e){}
+      }
+      clean('Google Sheet');render();
+      toast('✓ '+P.length+' project dimuat dari Google Sheet');
+    }else{
+      $('sdot').style.background='var(--mt)';
+      $('smsg').textContent='Google Sheet terhubung \u2014 belum ada data';
+      toast('Google Sheet kosong. Klik ↑ Sync untuk kirim data ke GSheet.','warn');
+    }
+  }catch(e){
+    $('sdot').style.background='var(--rd)';
+    $('smsg').textContent='Gagal load GSheet: '+e.message;
+    toast('Gagal load GSheet: '+e.message,'error');
+  }
+}
 
 // ===============================================================
 // EXCEL EXPORT/IMPORT
