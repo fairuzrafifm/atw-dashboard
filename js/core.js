@@ -1364,10 +1364,22 @@ window.addEventListener('afterprint',()=>{
 });
 
 function toggleTheme(){
-  const isLight=document.documentElement.classList.toggle('light');
-  const btn=$('themeBtn');
-  if(btn){btn.innerHTML=isLight?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';btn.title=isLight?'Mode Terang (klik untuk gelap)':'Mode Gelap (klik untuk terang)';}
-  try{localStorage.setItem('atw_theme',isLight?'light':'dark');}catch(e){}
+  const _html=document.documentElement;
+  const _body=document.body;
+  // Fade out → ganti tema (tak terlihat) → fade in
+  _body.style.transition='opacity 180ms ease-in';
+  _body.style.opacity='0';
+  setTimeout(()=>{
+    const isLight=_html.classList.toggle('light');
+    const btn=$('themeBtn');
+    if(btn){btn.innerHTML=isLight?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>':'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';btn.title=isLight?'Mode Terang':'Mode Gelap';}
+    try{localStorage.setItem('atw_theme',isLight?'light':'dark');}catch(e){}
+    requestAnimationFrame(()=>{
+      _body.style.transition='opacity 220ms ease-out';
+      _body.style.opacity='1';
+      setTimeout(()=>{_body.style.transition='';_body.style.opacity='';},240);
+    });
+  },200);
 }
 function loadTheme(){
   try{
@@ -1606,5 +1618,37 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 // ── STARTUP ─────────────────────────────────────────────────────
+// ── TOAST NOTIFICATION (override utils.js) ──────────────────────
+// Support: toast(msg) | toast(msg,'success'|'error'|'warn'|'info')
+// Backward compat: toast(msg,true) → error, toast(msg,'warn') → warning
+(function(){
+  const _icons={
+    success:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    error:  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    warn:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+    info:   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+  };
+  window.toast=function(msg,type){
+    const t=document.getElementById('toast');
+    if(!t)return;
+    // Normalize type
+    if(type===true||type==='error')type='error';
+    else if(type==='warn'||type==='warning')type='warn';
+    else if(type==='info')type='info';
+    else type='success';
+    clearTimeout(t._tid);
+    // Slide out first jika sudah ada toast
+    t.classList.remove('show');
+    const _show=()=>{
+      t.className='toast t-'+type;
+      t.innerHTML='<span style="flex-shrink:0;display:flex;align-items:center">'+_icons[type]+'</span><span style="flex:1;line-height:1.4">'+msg+'</span>';
+      void t.offsetHeight; // reflow untuk trigger animasi
+      t.classList.add('show');
+      t._tid=setTimeout(()=>t.classList.remove('show'),3200);
+    };
+    if(t.classList.contains('show')){setTimeout(_show,120);}else{_show();}
+  };
+})();
+
 // initAuth() dipanggil di sini setelah semua fungsi (render, loadDashLogo, dll) sudah terdefinisi
 if(typeof initAuth==='function') initAuth();
