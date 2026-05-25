@@ -104,8 +104,8 @@
     btn.textContent = 'Mendaftar...';
 
     try {
-      const { createClient } = supabase;
-      const cl = createClient(SUPABASE_URL, SUPABASE_ANON);
+      const cl = getSb();
+      if (!cl) throw new Error('Supabase tidak tersedia — coba refresh halaman');
       const { data, error } = await cl.auth.signUp({
         email, password: pass,
         options: { data: { full_name: name, requested_role: role } }
