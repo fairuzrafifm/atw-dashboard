@@ -210,12 +210,9 @@ function _updateDocKPI() {
   var ovDocS = document.getElementById('ovDocS');
   if (!ovDoc) return;
   var docs = typeof DOCS !== 'undefined' ? DOCS : [];
-  var total    = docs.length;
-  var wip      = docs.filter(function(d) { return d.status === 'WIP'; }).length;
-  var approved = docs.filter(function(d) { return d.status === 'Approved' || d.status === 'Approved with Note'; }).length;
-  var rejected = docs.filter(function(d) { return d.status === 'Rejected'; }).length;
+  var total = docs.length;
 
-  // Pakai _countUp (dari core.js) agar skel class otomatis terhapus
+  // Pakai _countUp agar skel class otomatis terhapus
   if (typeof _countUp === 'function') {
     ovDoc.style.color = 'var(--pu)';
     _countUp(ovDoc, total, '', 600);
@@ -226,10 +223,28 @@ function _updateDocKPI() {
   }
 
   if (ovDocS) {
-    ovDocS.innerHTML =
-      '<span style="color:var(--or)">WIP: ' + wip + '</span>' +
-      ' · <span style="color:var(--gn)">OK: ' + approved + '</span>' +
-      (rejected > 0 ? ' · <span style="color:var(--rd)">Rej: ' + rejected + '</span>' : '');
+    // Hitung semua status dari _DOC_STATUS_CFG
+    var parts = _DOC_STATUS_KEYS.map(function(s) {
+      var cnt = docs.filter(function(d) { return d.status === s; }).length;
+      if (!cnt) return null;
+      var cfg = _DOC_STATUS_CFG[s];
+      // Singkat label agar muat di KPI kecil
+      var lbl = s === 'Approved with Note' ? 'ApvNote'
+               : s === 'Submitted'         ? 'Sub'
+               : s === 'On Review'         ? 'Review'
+               : s;
+      return '<span style="color:' + cfg.c + '">' + lbl + ': ' + cnt + '</span>';
+    }).filter(Boolean);
+
+    // Juga tangkap status tidak dikenal (custom)
+    docs.forEach(function(d) {
+      if (d.status && !_DOC_STATUS_CFG[d.status]) {
+        var found = parts.some(function(p) { return p.indexOf(d.status) !== -1; });
+        if (!found) parts.push('<span style="color:var(--mt)">' + d.status + ': 1</span>');
+      }
+    });
+
+    ovDocS.innerHTML = parts.join(' <span style="color:var(--bd)">·</span> ') || '<span style="color:var(--mt)">Belum ada data</span>';
   }
 }
 
