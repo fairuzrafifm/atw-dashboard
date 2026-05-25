@@ -1,3 +1,46 @@
+// ── ANIMASI: counter number untuk KPI ────────────────────────
+function _countUp(el, target, suffix, duration) {
+  if (!el) return;
+  const prev = parseFloat(el.dataset.lastVal || 0);
+  if (prev === target && !el.classList.contains('skel')) return;
+  el.dataset.lastVal = target;
+  el.classList.remove('skel');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 400);
+  if (duration <= 0 || target === 0) { el.textContent = target + (suffix||''); return; }
+  const start = performance.now();
+  const step = (ts) => {
+    const p = Math.min((ts - start) / duration, 1);
+    const e = 1 - Math.pow(1 - p, 3); // ease-out cubic
+    el.textContent = Math.round(prev + (target - prev) * e) + (suffix||'');
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = target + (suffix||'');
+  };
+  requestAnimationFrame(step);
+}
+function _countUpRp(el, target, duration) {
+  if (!el) return;
+  const prev = parseFloat(el.dataset.lastVal || 0);
+  if (prev === target && !el.classList.contains('skel')) return;
+  el.dataset.lastVal = target;
+  el.classList.remove('skel');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 400);
+  if (duration <= 0 || target === 0) {
+    el.textContent = typeof fmtRpShort==='function'?fmtRpShort(target):'Rp 0'; return;
+  }
+  const start = performance.now();
+  const step = (ts) => {
+    const p = Math.min((ts - start) / duration, 1);
+    const e = 1 - Math.pow(1 - p, 3);
+    const cur = Math.round(prev + (target - prev) * e);
+    el.textContent = typeof fmtRpShort==='function'?fmtRpShort(cur):'Rp '+cur;
+    if (p < 1) requestAnimationFrame(step);
+    else el.textContent = typeof fmtRpShort==='function'?fmtRpShort(target):'Rp '+target;
+  };
+  requestAnimationFrame(step);
+}
+
 // ===============================================================
 // OVERVIEW TAB
 // ===============================================================
@@ -25,18 +68,18 @@ function renderOV(){
   const todayMp=MPLOGS.filter(m=>m.date===today);
   const mhAct=todayMp.reduce((s,m)=>s+(+m.mhActual||0),0);
   const mhPlan=P.reduce((s,p)=>s+(+p.mhPlan||0),0);
-  $('ov1').textContent=P.length;
-  $('ov2').textContent=mhAct+' jam';
+  _countUp($('ov1'),P.length,'',700);
+  _countUp($('ov2'),mhAct,' jam',900);
   $('ov2s').textContent='Plan: '+mhPlan+' jam | Var: '+(mhAct-mhPlan>=0?'+':'')+(mhAct-mhPlan);
   $('ov2').style.color=mhAct>=mhPlan?'var(--gn)':'var(--rd)';
   $('ovOT').textContent=P.filter(p=>p.status==='On Track').length;
   $('ovDL').textContent=P.filter(p=>p.status==='Delayed').length;
   $('ovCR').textContent=P.filter(p=>p.status==='Critical').length;
-  $('ov4').textContent=ISS.filter(i=>i.status!=='Closed').length;
+  _countUp($('ov4'),ISS.filter(i=>i.status!=='Closed').length,'',600);
   const accTL=ACCLOGS.reduce((s,a)=>s+(+a.timeLost||0),0);
   const mpTL=MPLOGS.reduce((s,m)=>s+(+m.timeLost||0),0);
   const totTL=accTL+mpTL;
-  $('ov5').textContent=totTL+' hr';
+  _countUp($('ov5'),totTL,' hr',750);
   $('ov5').title=`Accident: ${accTL} hr + Weather/Lainnya: ${mpTL} hr`;
   $('tlt').textContent=totTL+' hrs';
   if($('tltAcc'))$('tltAcc').textContent=accTL+' hrs';
@@ -52,7 +95,7 @@ function renderOV(){
     const totalCost=allCosts.reduce((s,c)=>s+(+c.amount||0),0);
     const procCost=allCosts.filter(c=>c.type==='procurement').reduce((s,c)=>s+(+c.amount||0),0);
     const opexCost=allCosts.filter(c=>c.type!=='procurement').reduce((s,c)=>s+(+c.amount||0),0);
-    $('ov6').textContent=typeof fmtRpShort==='function'?fmtRpShort(totalCost):'Rp 0';
+    _countUpRp($('ov6'),totalCost,900);
     if($('ov6s'))$('ov6s').innerHTML=`<span style="color:var(--bl)">Proc: ${typeof fmtRpShort==='function'?fmtRpShort(procCost):'0'}</span> · <span style="color:var(--pu)">OPEX: ${typeof fmtRpShort==='function'?fmtRpShort(opexCost):'0'}</span>`;
   }
 
@@ -66,7 +109,14 @@ function renderOV(){
     const raw=p.weather||'Partly Cloudy';
     const desc=wmap[raw]||raw.replace(/^[^\s]+\s/,'');
     return `<div class="wi"><div class="wi-ico">${wico[desc]||'⛅'}</div><div class="wi-name">${p.nama.split(' ').slice(0,3).join(' ')}</div><div class="wi-desc" style="color:${wclr[desc]||'var(--tx)'}">${desc}</div></div>`;
-  }).join('');}
+  }).join('');
+  // Animate progress bars after DOM render
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    el.querySelectorAll('.psc-bar-fill[data-w]').forEach(b=>{
+      b.style.width = (b.dataset.w||0)+'%';
+    });
+  }));
+}
 
   // ACCIDENT LOG aggregate
   const agg={fatality:0,lti:0,minorInjury:0,medTreatment:0,propertyDamage:0,fire:0,traffic:0,environment:0,nearMiss:0};
@@ -162,11 +212,11 @@ function renderProjStatusCards(){
       </div>
       <div class="psc-bar-wrap">
         <div class="psc-bar-lbl"><span>Actual</span><span style="color:${mc}">${p.actual}%</span></div>
-        <div class="psc-bar"><div class="psc-bar-fill" style="width:${p.actual}%;background:${bc}"></div></div>
+        <div class="psc-bar"><div class="psc-bar-fill" style="width:0%;background:${bc}" data-w="${p.actual}"></div></div>
       </div>
       <div class="psc-bar-wrap">
         <div class="psc-bar-lbl"><span>Plan</span><span style="color:var(--bl)">${p.plan}%</span></div>
-        <div class="psc-bar"><div class="psc-bar-fill" style="width:${p.plan}%;background:rgba(59,130,246,.45)"></div></div>
+        <div class="psc-bar"><div class="psc-bar-fill" style="width:0%;background:rgba(59,130,246,.45)" data-w="${p.plan}"></div></div>
       </div>
       ${(()=>{
         if(!p.mulai||!p.selesai)return '';
