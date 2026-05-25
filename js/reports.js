@@ -129,62 +129,73 @@ function generateMpReport(){
   if(!_pdfLogo){const _li=$('dashLogoImg');if(_li&&_li.src&&_li.src.startsWith('data:'))_pdfLogo=_li.src;}
   const _mpPrintDate=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Manpower Report — \${proj?.kode||'All Projects'}</title>
+    <title>Manpower Report — ${proj?.kode||'All Projects'}</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:Arial,sans-serif;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10.5px}
-      .pdf-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1e293b;color:#f1f5f9;border-radius:6px 6px 0 0;margin-bottom:12px}
-      .pdf-hdr-left{display:flex;align-items:center;gap:12px}
-      .pdf-hdr-logo{height:34px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
-      .pdf-hdr-title{font-size:12px;font-weight:700;letter-spacing:.3px}
-      .pdf-hdr-sub{font-size:9px;color:#94a3b8;margin-top:2px}
-      .pdf-hdr-right{text-align:right;font-size:9px;color:#94a3b8}
-      .pdf-hdr-right strong{display:block;font-size:11px;color:#f1f5f9;margin-bottom:2px}
-      .pdf-ftr{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#9ca3af}
-      table{width:100%;border-collapse:collapse;font-size:10px}
-      th{background:#1e293b;color:#f1f5f9;padding:5px 8px;text-align:left;font-size:8.5px;letter-spacing:.5px}
-      th.r,td.r{text-align:center}
-      td{padding:3px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
-      tr:nth-child(even) td{background:#f8fafc}
-      .kat-row td{background:#dbeafe;font-weight:700;font-size:9px;color:#1e40af;padding:5px 8px}
-      .sub-row td{background:#fefce8;font-size:8.5px;padding:2px 8px;color:#374151}
-      .total-row td{background:#1e293b;color:#f1f5f9;font-weight:700;padding:5px 8px}
+      .pdf-wrap{width:100%;border-collapse:collapse;table-layout:fixed}
+      .pdf-wrap thead td,.pdf-wrap tfoot td{padding:0}
+      .pdf-wrap tbody td{padding:0;vertical-align:top}
+      .pdf-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#1e293b;color:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .pdf-hdr-logo{height:32px;object-fit:contain;background:#fff;border-radius:3px;padding:2px 4px}
+      .pdf-hdr-info{margin-left:10px}
+      .pdf-hdr-title{font-size:12px;font-weight:700;letter-spacing:.2px}
+      .pdf-hdr-sub{font-size:8.5px;color:#94a3b8;margin-top:1px}
+      .pdf-hdr-right{text-align:right;font-size:9px;color:#94a3b8;white-space:nowrap}
+      .pdf-hdr-right strong{display:block;font-size:11px;color:#f1f5f9;margin-bottom:1px}
+      .pdf-hdr-spacer{height:10px}
+      .pdf-ftr{display:flex;align-items:center;justify-content:space-between;padding:5px 14px;border-top:1.5px solid #1e293b;font-size:8px;color:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .pdf-ftr-spacer{height:6px}
+      .wr-sec{margin-bottom:14px}
+      .wr-sec-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f97316;border-bottom:1px solid #fed7aa;padding-bottom:3px;margin-bottom:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      table.data-table,table.wr-tbl{width:100%;border-collapse:collapse;font-size:9.5px}
+      table.data-table th,table.wr-tbl th{background:#1e293b;color:#f1f5f9;padding:4px 7px;text-align:left;font-size:8.5px;letter-spacing:.4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .data-table th.r,.data-table td.r,.wr-tbl th.r,.wr-tbl td.r{text-align:center}
+      table.data-table td,table.wr-tbl td{padding:3px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+      table.data-table tr:nth-child(even) td,table.wr-tbl tr:nth-child(even) td{background:#f8fafc;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .kat-row td{background:#dbeafe;color:#1e40af!important;font-weight:700;font-size:9px;color:#1e40af;padding:5px 7px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .sub-row td{background:#fefce8!important;font-size:8.5px;padding:2px 7px;color:#374151;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .total-row td{background:#1e293b!important;color:#f1f5f9!important;font-weight:700;padding:5px 7px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:600}
+      .pb,.wr-pb{page-break-before:always;break-before:page}
       @media print{
-        @page{size:A4 landscape;margin:28mm 12mm 18mm 12mm}
+        @page{size:A4 landscape;margin:12mm}
         body{padding:0}
-        .pdf-hdr{position:fixed;top:0;left:0;right:0;height:24mm;display:flex!important;align-items:center;justify-content:space-between;padding:4mm 12mm;margin-bottom:0;border-radius:0;background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
-        .pdf-ftr{position:fixed;bottom:0;left:0;right:0;height:14mm;display:flex!important;align-items:center;justify-content:space-between;padding:0 12mm;margin-top:0;border-top:2px solid #1e293b;background:#fff!important;font-size:8px;color:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
-        .pdf-body{margin-top:26mm;margin-bottom:16mm}
-        .pb{page-break-before:always;break-before:page}
-        th{background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        .kat-row td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        .sub-row td{background:#fefce8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        .total-row td{background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        tr:nth-child(even) td{background:#f8fafc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        tr{break-inside:avoid;page-break-inside:avoid}
         thead{display:table-header-group}
+        tfoot{display:table-footer-group}
+        tbody{display:table-row-group}
+        tr{break-inside:avoid}
       }
     </style>
   </head><body>
-  <div class="pdf-hdr">
-    <div class="pdf-hdr-left">
-      <img class="pdf-hdr-logo" src="\${_pdfLogo}" alt="ATW Solar" onerror="this.style.display='none'">
-      <div>
-        <div class="pdf-hdr-title">ATW SOLAR — PROJECT PERFORMANCE DASHBOARD</div>
-        <div class="pdf-hdr-sub">Manpower Report &mdash; \${proj?.kode||'All Projects'}</div>
+  <table class="pdf-wrap"><thead><tr><td>
+    <div class="pdf-hdr">
+      <div style="display:flex;align-items:center;flex:1">
+        <img class="pdf-hdr-logo" src="${_pdfLogo}" alt="" onerror="this.style.display='none'">
+        <div class="pdf-hdr-info">
+          <div class="pdf-hdr-title">ATW SOLAR &mdash; PROJECT PERFORMANCE</div>
+          <div class="pdf-hdr-sub">Manpower Report &mdash; ${proj?.kode||'All Projects'}</div>
+        </div>
+      </div>
+      <div style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 18px">
+        ${proj?.logo?('<img src="'+proj.logo+'" style="height:28px;max-width:110px;object-fit:contain;background:#fff;border-radius:3px;padding:2px 5px">'):''}
+      </div>
+      <div class="pdf-hdr-right" style="flex:0 0 auto">
+        <strong>${proj?.name||'All Projects'}</strong>
+        <span>Periode: ${periodLabel}</span>
       </div>
     </div>
-    <div class="pdf-hdr-right">
-      <strong>\${proj?.name||'All Projects'}</strong>
-      <span>Periode: \${periodLabel}</span>
+    <div class="pdf-hdr-spacer"></div>
+  </td></tr></thead>
+  <tfoot><tr><td>
+    <div class="pdf-ftr-spacer"></div>
+    <div class="pdf-ftr">
+      <span>ATW Solar &mdash; Project Performance</span>
+      <span>Dicetak: ${_mpPrintDate}</span>
     </div>
-  </div>
-  <div class="pdf-ftr">
-    <span>ATW Solar &mdash; Project Performance Dashboard</span>
-    <span>Dicetak: \${_mpPrintDate}</span>
-  </div>
-  <div class="pdf-body">\${html}</div>
+  </td></tr></tfoot>
+  <tbody><tr><td>${html}</td></tr></tbody>
+  </table>
   </body></html>`;
 
   const iframe=document.createElement('iframe');
@@ -452,58 +463,73 @@ function generateWeeklyReport(){
   const _wrPrintDate=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const _wrProj=P.find(p=>String(p.id)===String(projId));
   const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Weekly Report W\${String(week).padStart(2,'0')}</title>
+    <title>Weekly Report W${String(week).padStart(2,'0')}</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:Arial,sans-serif;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10.5px}
-      .pdf-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1e293b;color:#f1f5f9;border-radius:6px 6px 0 0;margin-bottom:14px}
-      .pdf-hdr-left{display:flex;align-items:center;gap:12px}
-      .pdf-hdr-logo{height:34px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
-      .pdf-hdr-title{font-size:12px;font-weight:700;letter-spacing:.3px}
-      .pdf-hdr-sub{font-size:9px;color:#94a3b8;margin-top:2px}
-      .pdf-hdr-right{text-align:right;font-size:9px;color:#94a3b8}
-      .pdf-hdr-right strong{display:block;font-size:11px;color:#f1f5f9;margin-bottom:2px}
-      .pdf-ftr{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#9ca3af}
-      .wr-sec{margin-bottom:16px}
-      .wr-sec-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f97316;border-bottom:1px solid #fed7aa;padding-bottom:3px;margin-bottom:8px}
-      table{width:100%;border-collapse:collapse;font-size:9.5px}
-      th{background:#1e293b;color:#f1f5f9;padding:4px 7px;text-align:left;font-size:8.5px;letter-spacing:.4px}
-      th.r,td.r{text-align:center}
-      td{padding:3px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}
-      tr:nth-child(even) td{background:#f8fafc}
+      .pdf-wrap{width:100%;border-collapse:collapse;table-layout:fixed}
+      .pdf-wrap thead td,.pdf-wrap tfoot td{padding:0}
+      .pdf-wrap tbody td{padding:0;vertical-align:top}
+      .pdf-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#1e293b;color:#f1f5f9;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .pdf-hdr-logo{height:32px;object-fit:contain;background:#fff;border-radius:3px;padding:2px 4px}
+      .pdf-hdr-info{margin-left:10px}
+      .pdf-hdr-title{font-size:12px;font-weight:700;letter-spacing:.2px}
+      .pdf-hdr-sub{font-size:8.5px;color:#94a3b8;margin-top:1px}
+      .pdf-hdr-right{text-align:right;font-size:9px;color:#94a3b8;white-space:nowrap}
+      .pdf-hdr-right strong{display:block;font-size:11px;color:#f1f5f9;margin-bottom:1px}
+      .pdf-hdr-spacer{height:10px}
+      .pdf-ftr{display:flex;align-items:center;justify-content:space-between;padding:5px 14px;border-top:1.5px solid #1e293b;font-size:8px;color:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .pdf-ftr-spacer{height:6px}
+      .wr-sec{margin-bottom:14px}
+      .wr-sec-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f97316;border-bottom:1px solid #fed7aa;padding-bottom:3px;margin-bottom:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      table.data-table,table.wr-tbl{width:100%;border-collapse:collapse;font-size:9.5px}
+      table.data-table th,table.wr-tbl th{background:#1e293b;color:#f1f5f9;padding:4px 7px;text-align:left;font-size:8.5px;letter-spacing:.4px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .data-table th.r,.data-table td.r,.wr-tbl th.r,.wr-tbl td.r{text-align:center}
+      table.data-table td,table.wr-tbl td{padding:3px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+      table.data-table tr:nth-child(even) td,table.wr-tbl tr:nth-child(even) td{background:#f8fafc;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .kat-row td{background:#dbeafe;color:#1e40af!important;font-weight:700;font-size:9px;color:#1e40af;padding:5px 7px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .sub-row td{background:#fefce8!important;font-size:8.5px;padding:2px 7px;color:#374151;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .total-row td{background:#1e293b!important;color:#f1f5f9!important;font-weight:700;padding:5px 7px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+      .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:600}
+      .pb,.wr-pb{page-break-before:always;break-before:page}
       @media print{
-        @page{size:A4 landscape;margin:28mm 12mm 18mm 12mm}
+        @page{size:A4 landscape;margin:12mm}
         body{padding:0}
-        .pdf-hdr{position:fixed;top:0;left:0;right:0;height:24mm;display:flex!important;align-items:center;justify-content:space-between;padding:4mm 12mm;margin-bottom:0;border-radius:0;background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
-        .pdf-ftr{position:fixed;bottom:0;left:0;right:0;height:14mm;display:flex!important;align-items:center;justify-content:space-between;padding:0 12mm;margin-top:0;border-top:2px solid #1e293b;background:#fff!important;font-size:8px;color:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
-        .pdf-body{margin-top:26mm;margin-bottom:16mm}
-        .wr-pb{page-break-before:always;break-before:page}
-        th{background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        tr:nth-child(even) td{background:#f8fafc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        tr{break-inside:avoid;page-break-inside:avoid}
         thead{display:table-header-group}
         tfoot{display:table-footer-group}
+        tbody{display:table-row-group}
+        tr{break-inside:avoid}
       }
     </style>
   </head><body>
-  <div class="pdf-hdr">
-    <div class="pdf-hdr-left">
-      <img class="pdf-hdr-logo" src="\${_wrLogo}" alt="ATW Solar" onerror="this.style.display='none'">
-      <div>
-        <div class="pdf-hdr-title">ATW SOLAR — PROJECT PERFORMANCE DASHBOARD</div>
-        <div class="pdf-hdr-sub">Weekly Report — Week \${String(week).padStart(2,'0')}</div>
+  <table class="pdf-wrap"><thead><tr><td>
+    <div class="pdf-hdr">
+      <div style="display:flex;align-items:center;flex:1">
+        <img class="pdf-hdr-logo" src="${_wrLogo}" alt="" onerror="this.style.display='none'">
+        <div class="pdf-hdr-info">
+          <div class="pdf-hdr-title">ATW SOLAR &mdash; PROJECT PERFORMANCE</div>
+          <div class="pdf-hdr-sub">Weekly Report &mdash; Week ${String(week).padStart(2,'0')}</div>
+        </div>
+      </div>
+      <div style="flex:0 0 auto;display:flex;align-items:center;justify-content:center;padding:0 18px">
+        ${_wrProj?.logo?('<img src="'+_wrProj.logo+'" style="height:28px;max-width:110px;object-fit:contain;background:#fff;border-radius:3px;padding:2px 5px">'):''}
+      </div>
+      <div class="pdf-hdr-right" style="flex:0 0 auto">
+        <strong>${_wrProj?.kode||''} ${_wrProj?.name||''}</strong>
+        <span>Week ${String(week).padStart(2,'0')} / ${new Date().getFullYear()}</span>
       </div>
     </div>
-    <div class="pdf-hdr-right">
-      <strong>\${_wrProj?.kode||''} \${_wrProj?.name||''}</strong>
-      <span>Week \${String(week).padStart(2,'0')} / \${new Date().getFullYear()}</span>
+    <div class="pdf-hdr-spacer"></div>
+  </td></tr></thead>
+  <tfoot><tr><td>
+    <div class="pdf-ftr-spacer"></div>
+    <div class="pdf-ftr">
+      <span>ATW Solar &mdash; Project Performance</span>
+      <span>Dicetak: ${_wrPrintDate}</span>
     </div>
-  </div>
-  <div class="pdf-ftr">
-    <span>ATW Solar &mdash; Project Performance Dashboard</span>
-    <span>Dicetak: \${_wrPrintDate}</span>
-  </div>
-  <div class="pdf-body">\${html}</div>
+  </td></tr></tfoot>
+  <tbody><tr><td>${html}</td></tr></tbody>
+  </table>
   </body></html>`;
 
   const iframe=document.createElement('iframe');
@@ -597,24 +623,17 @@ function buildWeeklyReportHTML(projId,week){
 
   // Table styles
   const ts=`border:1px solid #d1d5db;border-collapse:collapse;width:100%;font-size:10px`;
-  const th=`background:#e5e7eb;font-weight:700;padding:4px 6px;border:1px solid #9ca3af;text-align:center;font-size:9px;text-transform:uppercase`;
-  const td=`padding:4px 6px;border:1px solid #d1d5db;vertical-align:top`;
-  const tdc=`padding:4px 6px;border:1px solid #d1d5db;text-align:center;vertical-align:middle`;
+  const th=`background:#e2e8f0;color:#1e293b;font-weight:700;padding:4px 6px;border:1px solid #9ca3af;text-align:center;font-size:9px;text-transform:uppercase`;
+  const td=`padding:4px 6px;border:1px solid #d1d5db;vertical-align:top;color:#1e293b`;
+  const tdc=`padding:4px 6px;border:1px solid #d1d5db;text-align:center;vertical-align:middle;color:#1e293b`;
 
   let html=`<div style="font-family:Arial,sans-serif;color:#1e293b;background:#fff;padding:20px 24px;max-width:100%;font-size:10px">
-
-  ${'<'}!-- HEADER LOGOS -->
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:3px solid #f97316">
-    ${clientLogoHtml}
-    ${atwLogoHtml}
-  </div>
-
 
   ${'<'}!-- PROJECT INFO -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
     <div>
       <table style="${ts}">
-        <tr><td style="${td};font-weight:700;background:#f9fafb;width:120px">Project</td><td style="${td}">${proj.kode} \u2014 ${proj.nama}</td></tr>
+        <tr><td style="${td};font-weight:700;background:#475569;color:#fff;width:120px">Project</td><td style="${td}">${proj.kode} \u2014 ${proj.nama}</td></tr>
         <tr><td style="${td};font-weight:700;background:#f9fafb">Client</td><td style="${td}">${proj.client||'\u2014'}</td></tr>
         <tr><td style="${td};font-weight:700;background:#f9fafb">Lokasi</td><td style="${td}">${proj.lokasi||'\u2014'}</td></tr>
         <tr><td style="${td};font-weight:700;background:#f9fafb">Periode</td><td style="${td}">${weekStart} \u2014 ${weekEnd}</td></tr>
@@ -623,7 +642,7 @@ function buildWeeklyReportHTML(projId,week){
     </div>
     <div>
       <table style="${ts}">
-        <tr><td style="${th}" colspan="4">PROGRESS REPORT</td></tr>
+        <tr><td style="background:#1e293b;color:#f1f5f9;font-weight:700;padding:5px 6px;border:1px solid #0f172a;text-align:center;font-size:9px;text-transform:uppercase" colspan="4">PROGRESS REPORT</td></tr>
         <tr><th style="${th}">Indikator</th><th style="${th}">Weekly</th><th style="${th}">Kumulatif</th><th style="${th}">Status</th></tr>
         <tr><td style="${td};font-weight:700;color:#3b82f6">Plan</td><td style="${tdc}">${wPlan.toFixed(2)}%</td><td style="${tdc};font-weight:700">${cumPlan.toFixed(2)}%</td><td rowspan="2" style="${tdc};font-weight:700;color:${statusClr};font-size:12px">${statusTxt}</td></tr>
         <tr><td style="${td};font-weight:700;color:#f97316">Actual</td><td style="${tdc}">${wAct.toFixed(2)}%</td><td style="${tdc};font-weight:700;color:#f97316">${cumAct.toFixed(2)}%</td></tr>
@@ -659,20 +678,20 @@ function buildWeeklyReportHTML(projId,week){
 
   // WBS rows
   cats.forEach((cat,ci)=>{
-    html+=`<tr style="background:#dbeafe"><td style="${tdc};font-weight:700;color:#1d4ed8">${String.fromCharCode(65+ci)}</td><td style="${td};font-weight:700;color:#1d4ed8" colspan="8">${cat.name}</td></tr>`;
+    html+=`<tr style="background:#dbeafe;color:#1e40af"><td style="${tdc};font-weight:700;color:#1d4ed8">${String.fromCharCode(65+ci)}</td><td style="${td};font-weight:700;color:#1d4ed8" colspan="8">${cat.name}</td></tr>`;
     all.filter(w=>w.type==='subcat'&&w.parentId===cat.id).sort((a,b)=>a.order-b.order).forEach((sub,si)=>{
       const subItems=all.filter(w=>w.type==='item'&&w.parentId===sub.id).sort((a,b)=>a.order-b.order);
       const isLeaf=subItems.length===0;
       if(isLeaf){html+=_wrItemRowNew(`${ci+1}.${si+1}`,sub,week,th,td,tdc,true);}
       else{
-        html+=`<tr style="background:#dcfce7"><td style="${tdc};color:#15803d">${ci+1}.${si+1}</td><td style="${td};font-weight:600;color:#15803d" colspan="8">${sub.name}</td></tr>`;
+        html+=`<tr style="background:#dcfce7;color:#15803d"><td style="${tdc};color:#15803d">${ci+1}.${si+1}</td><td style="${td};font-weight:600;color:#15803d" colspan="8">${sub.name}</td></tr>`;
         subItems.forEach((item,ii)=>{html+=_wrItemRowNew(`${ci+1}.${si+1}.${ii+1}`,item,week,th,td,tdc,false);});
       }
     });
   });
   // Totals row
   const totalKontrib=leafNodes.reduce((s,n)=>s+_drNodeKontrib(n,weekStartDate?weekEndDate.toISOString().slice(0,10):new Date().toISOString().slice(0,10)),0);
-  html+=`<tr style="background:#f1f5f9;font-weight:700">
+  html+=`<tr style="background:#e2e8f0;color:#1e293b;font-weight:700">
     <td style="${tdc}" colspan="7">TOTAL KONTRIBUSI MINGGU INI</td>
     <td style="${tdc};color:#16a34a">${(totalKontrib*100).toFixed(2)}%</td><td></td>
   </tr>`;
@@ -732,15 +751,15 @@ function buildWeeklyReportHTML(projId,week){
   html+=`<div style="background:#374151;color:#fff;text-align:center;padding:5px;font-weight:700;font-size:11px;margin-bottom:0">REKAPITULASI MANPOWER & TIME LOST</div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
     <table style="${ts}">
-      <tr><th style="${th}" colspan="8">MANPOWER WEEKLY SUMMARY</th></tr>
+      <tr><th style="background:#475569;color:#fff;font-weight:700;padding:5px 6px;border:1px solid #334155;text-align:center;font-size:9px;text-transform:uppercase" colspan="8">MANPOWER WEEKLY SUMMARY</th></tr>
       <tr><th style="${th}">Tgl</th><th style="${th}">SPV</th><th style="${th}">Mdr</th><th style="${th}">Inst</th><th style="${th}">Tkng</th><th style="${th}">Hlpr</th><th style="${th}">Safety</th><th style="${th}">Total</th></tr>`;
   mpLogs.sort((a,b)=>a.date.localeCompare(b.date)).forEach(m=>{
     html+=`<tr><td style="${tdc};font-size:9px">${m.date.slice(5)}</td><td style="${tdc}">${m.spv||0}</td><td style="${tdc}">${m.mandor||0}</td><td style="${tdc}">${m.installer||0}</td><td style="${tdc}">${m.tukang||0}</td><td style="${tdc}">${m.helper||0}</td><td style="${tdc}">${m.safety||0}</td><td style="${tdc};font-weight:700">${m.total||0}</td></tr>`;
   });
-  html+=`<tr style="background:#f1f5f9;font-weight:700"><td style="${tdc}">TOTAL</td><td style="${tdc}">${totalSpv}</td><td style="${tdc}">${totalMandor}</td><td style="${tdc}">${totalInstaller}</td><td style="${tdc}">${totalTukang}</td><td style="${tdc}">${totalHelper}</td><td style="${tdc}">${totalSafety}</td><td style="${tdc};color:#f97316">${totalWorkers}</td></tr>`;
+  html+=`<tr style="background:#e2e8f0;color:#1e293b;font-weight:700"><td style="${tdc}">TOTAL</td><td style="${tdc}">${totalSpv}</td><td style="${tdc}">${totalMandor}</td><td style="${tdc}">${totalInstaller}</td><td style="${tdc}">${totalTukang}</td><td style="${tdc}">${totalHelper}</td><td style="${tdc}">${totalSafety}</td><td style="${tdc};color:#f97316">${totalWorkers}</td></tr>`;
   html+=`</table>
     <table style="${ts}">
-      <tr><th style="${th}" colspan="3">TIME LOST RECORD</th></tr>
+      <tr><th style="background:#475569;color:#fff;font-weight:700;padding:5px 6px;border:1px solid #334155;text-align:center;font-size:9px;text-transform:uppercase" colspan="3">TIME LOST RECORD</th></tr>
       <tr><th style="${th}">Tanggal</th><th style="${th}">Jam Lost</th><th style="${th}">Penyebab</th></tr>`;
   const tlLogs=mpLogs.filter(m=>+m.timeLost>0);
   if(tlLogs.length){
@@ -748,7 +767,7 @@ function buildWeeklyReportHTML(projId,week){
   }else{
     html+=`<tr><td colspan="3" style="${tdc};color:#16a34a">Tidak ada time lost minggu ini ✓</td></tr>`;
   }
-  html+=`<tr style="background:#f1f5f9;font-weight:700"><td style="${tdc}">TOTAL</td><td style="${tdc};color:${timeLost>0?'#dc2626':'#16a34a'}">${timeLost}h</td><td style="${td};font-size:9px">${timeLostReasons||'\u2014'}</td></tr>`;
+  html+=`<tr style="background:#e2e8f0;color:#1e293b;font-weight:700"><td style="${tdc}">TOTAL</td><td style="${tdc};color:${timeLost>0?'#dc2626':'#16a34a'}">${timeLost}h</td><td style="${td};font-size:9px">${timeLostReasons||'\u2014'}</td></tr>`;
   html+=`</table></div>`;
 
   // SECTION 4: HSE
@@ -806,15 +825,6 @@ function buildWeeklyReportHTML(projId,week){
   <div style="font-family:Arial,sans-serif;color:#1e293b;background:#fff;padding:20px 24px;max-width:100%;font-size:10px">
 
   ${'<'}!-- PAGE 2 HEADER -->
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid #f97316">
-    ${clientLogoHtml}
-    <div style="text-align:center">
-      <div style="font-size:13px;font-weight:700;color:#1e293b">${proj.kode} \u2014 ${proj.nama}</div>
-      <div style="font-size:10px;color:#64748b">WEEKLY REPORT W${String(week).padStart(2,'0')} | ${weekStart} \u2014 ${weekEnd}</div>
-    </div>
-    ${atwLogoHtml}
-  </div>
-
   ${'<'}!-- S-CURVE SECTION -->
   <div style="background:#374151;color:#fff;text-align:center;padding:5px;font-weight:700;font-size:11px;margin-bottom:8px">S-CURVE PROGRESS \u2014 W${String(week).padStart(2,'0')}</div>
 
@@ -828,7 +838,7 @@ function buildWeeklyReportHTML(projId,week){
         const v=(+(d.cAct||0))-(+(d.cPlan||0));
         const clr=v>=0?'#16a34a':v>=-5?'#ea580c':'#dc2626';
         const isThisWeek=d.week===week;
-        return`<tr style="${isThisWeek?'background:#fff7ed;font-weight:700':''}">
+        return`<tr style="${isThisWeek?'background:#fff7ed;color:#c2410c;font-weight:700':''}">
           <td style="${tdc}${isThisWeek?';color:#f97316':''}">${isThisWeek?'\u25B6 ':''}W${String(d.week).padStart(2,'0')}</td>
           <td style="${tdc}">${(+d.wPlan||0).toFixed(2)}%</td>
           <td style="${tdc}">${(+d.wAct||0).toFixed(2)}%</td>
