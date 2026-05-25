@@ -13,11 +13,12 @@ if (typeof DOCS === 'undefined') var DOCS = [];
 
 // ── CONSTANTS ─────────────────────────────────────────────────────
 var _DOC_STATUS_CFG = {
-  'Submitted': { c: 'var(--bl)', bg: 'rgba(59,130,246,.15)',  bd: 'rgba(59,130,246,.3)'  },
-  'On Review': { c: 'var(--yw)', bg: 'rgba(245,158,11,.15)',  bd: 'rgba(245,158,11,.3)'  },
-  'Approved':  { c: 'var(--gn)', bg: 'rgba(16,185,129,.15)',  bd: 'rgba(16,185,129,.3)'  },
-  'Rejected':  { c: 'var(--rd)', bg: 'rgba(239,68,68,.15)',   bd: 'rgba(239,68,68,.3)'   },
-  'IFC':       { c: 'var(--pu)', bg: 'rgba(139,92,246,.15)',  bd: 'rgba(139,92,246,.3)'  },
+  'Submitted':          { c: 'var(--bl)', bg: 'rgba(59,130,246,.15)',  bd: 'rgba(59,130,246,.3)'  },
+  'On Review':          { c: 'var(--yw)', bg: 'rgba(245,158,11,.15)',  bd: 'rgba(245,158,11,.3)'  },
+  'Approved':           { c: 'var(--gn)', bg: 'rgba(16,185,129,.15)',  bd: 'rgba(16,185,129,.3)'  },
+  'Approved with Note': { c: '#10b981',   bg: 'rgba(16,185,129,.1)',   bd: 'rgba(245,158,11,.4)'  },
+  'Rejected':           { c: 'var(--rd)', bg: 'rgba(239,68,68,.15)',   bd: 'rgba(239,68,68,.3)'   },
+  'WIP':                { c: 'var(--or)', bg: 'rgba(249,115,22,.15)',   bd: 'rgba(249,115,22,.3)'  },
 };
 var _DOC_STATUS_KEYS = Object.keys(_DOC_STATUS_CFG);
 var _DOC_KATEGORI = [
@@ -99,18 +100,30 @@ async function loadDocsFromSupabase() {
     var client = _initSb();
     if (!client) return;
     var res = await client.from('documents').select('*').order('created_at', { ascending: false });
-    if (res.error) throw res.error;
+    // Jika tabel belum ada (migration belum dijalankan), res.error berisi kode 42P01
+    if (res.error) {
+      var code = res.error.code || '';
+      if (code === '42P01' || (res.error.message||'').includes('does not exist')) {
+        // Tabel belum ada — diam saja, jangan crash
+        console.info('[documents.js] Tabel documents belum ada. Jalankan documents_migration.sql di Supabase.');
+      } else {
+        console.warn('[documents.js] loadDocsFromSupabase:', res.error.message);
+      }
+      return;
+    }
     DOCS = (res.data || []).map(mapDocument);
   } catch (e) {
-    console.warn('[documents.js] loadDocsFromSupabase:', e.message);
+    // Tangkap semua error agar tidak crash dashboard
+    console.info('[documents.js] loadDocsFromSupabase (ignored):', e.message);
   }
 }
 
-// ── PATCH render() & loadFromSupabase() ──────────────────────────
+// ── PATCH render(), loadFromSupabase(), _syncAllProjSelectors() ──
 // Menggunakan polling agar aman terhadap urutan load script
 (function _patchGlobals() {
   var _renderPatched = false;
   var _loadPatched   = false;
+  var _syncPatched   = false;
 
   function _tryPatch() {
     // Patch render()
@@ -119,6 +132,7 @@ async function loadDocsFromSupabase() {
       window.render = function() {
         _origRender.apply(this, arguments);
         _syncDocProjDropdown();
+        _updateDocKPI();
         var tp = document.getElementById('tp-documents');
         if (tp && tp.classList.contains('active')) renderDocs();
       };
@@ -135,24 +149,88 @@ async function loadDocsFromSupabase() {
       _loadPatched = true;
     }
 
-    if (!_renderPatched || !_loadPatched) setTimeout(_tryPatch, 150);
+    // Patch _syncAllProjSelectors() — supaya docFiltProj ikut ter-sync saat klik sidebar
+    if (!_syncPatched && typeof window._syncAllProjSelectors === 'function') {
+      var _origSync = window._syncAllProjSelectors;
+      window._syncAllProjSelectors = function(id) {
+        _origSync.apply(this, arguments);
+        _syncDocProjDropdown(String(id));
+      };
+      _syncPatched = true;
+    }
+
+    if (!_renderPatched || !_loadPatched || !_syncPatched) setTimeout(_tryPatch, 150);
   }
 
   setTimeout(_tryPatch, 0);
 })();
 
 // ── SYNC PROJECT DROPDOWN (filter bar) ───────────────────────────
-function _syncDocProjDropdown() {
+// id opsional: jika diisi, set value ke id tsb; jika kosong, hanya rebuild opsi
+function _syncDocProjDropdown(id) {
   var sel = document.getElementById('docFiltProj');
-  if (!sel || sel.dataset.synced === '1') return;
+  if (!sel) return;
+
   var projects = typeof P !== 'undefined' ? P : [];
-  projects.forEach(function(p) {
-    var o = document.createElement('option');
-    o.value = p.id;
-    o.textContent = (p.kode ? p.kode + ' — ' : '') + (p.nama || '');
-    sel.appendChild(o);
-  });
-  sel.dataset.synced = '1';
+
+  // Jika P[] belum terisi, retry setelah 300ms
+  if (!projects.length) {
+    setTimeout(function() { _syncDocProjDropdown(id); }, 300);
+    return;
+  }
+
+  // Rebuild options (selalu fresh agar list up-to-date)
+  sel.innerHTML = '<option value="">Semua Project</option>' +
+    projects.map(function(p) {
+      return '<option value="' + p.id + '">' +
+        (p.kode ? p.kode + ' \u2014 ' : '') + (p.nama || '') +
+        '</option>';
+    }).join('');
+
+  // Set value ke project aktif sidebar (selId dari core.js)
+  var activeId = id || (typeof selId !== 'undefined' && selId ? String(selId) : '');
+  if (activeId) sel.value = activeId;
+
+  // Juga sync modal project dropdown
+  var mSel = document.getElementById('docModalProj');
+  if (mSel) {
+    var curVal = mSel.value;
+    mSel.innerHTML = projects.map(function(p) {
+      return '<option value="' + p.id + '">' +
+        (p.kode ? p.kode + ' \u2014 ' : '') + (p.nama || '') +
+        '</option>';
+    }).join('');
+    mSel.value = curVal || activeId || (projects[0] ? String(projects[0].id) : '');
+  }
+}
+
+// ── UPDATE KPI PORTFOLIO OVERVIEW ───────────────────────────────
+function _updateDocKPI() {
+  var ovDoc  = document.getElementById('ovDoc');
+  var ovDocS = document.getElementById('ovDocS');
+  if (!ovDoc) return;
+  var docs = typeof DOCS !== 'undefined' ? DOCS : [];
+  var total    = docs.length;
+  var wip      = docs.filter(function(d) { return d.status === 'WIP'; }).length;
+  var approved = docs.filter(function(d) { return d.status === 'Approved' || d.status === 'Approved with Note'; }).length;
+  var rejected = docs.filter(function(d) { return d.status === 'Rejected'; }).length;
+
+  // Pakai _countUp (dari core.js) agar skel class otomatis terhapus
+  if (typeof _countUp === 'function') {
+    ovDoc.style.color = 'var(--pu)';
+    _countUp(ovDoc, total, '', 600);
+  } else {
+    ovDoc.classList.remove('skel');
+    ovDoc.textContent = total;
+    ovDoc.style.color = 'var(--pu)';
+  }
+
+  if (ovDocS) {
+    ovDocS.innerHTML =
+      '<span style="color:var(--or)">WIP: ' + wip + '</span>' +
+      ' · <span style="color:var(--gn)">OK: ' + approved + '</span>' +
+      (rejected > 0 ? ' · <span style="color:var(--rd)">Rej: ' + rejected + '</span>' : '');
+  }
 }
 
 // ── STATUS BADGE ─────────────────────────────────────────────────
@@ -176,11 +254,56 @@ function _fmtDocDate(d) {
   catch(e) { return d; }
 }
 
+// ── KATEGORI COLOR MAP ────────────────────────────────────────────
+var _KAT_COLORS = [
+  {c:'var(--bl)', bg:'rgba(59,130,246,.1)',   bd:'rgba(59,130,246,.25)'},
+  {c:'var(--gn)', bg:'rgba(16,185,129,.1)',   bd:'rgba(16,185,129,.25)'},
+  {c:'var(--pu)', bg:'rgba(139,92,246,.1)',   bd:'rgba(139,92,246,.25)'},
+  {c:'var(--or)', bg:'rgba(249,115,22,.1)',   bd:'rgba(249,115,22,.25)'},
+  {c:'var(--yw)', bg:'rgba(245,158,11,.1)',   bd:'rgba(245,158,11,.25)'},
+  {c:'var(--rd)', bg:'rgba(239,68,68,.1)',    bd:'rgba(239,68,68,.25)'},
+  {c:'#06b6d4',  bg:'rgba(6,182,212,.1)',     bd:'rgba(6,182,212,.25)'},
+  {c:'#f472b6',  bg:'rgba(244,114,182,.1)',   bd:'rgba(244,114,182,.25)'},
+];
+var _katColorMap = {};
+
+function _katColor(kat) {
+  if (!kat) return {c:'var(--mt)', bg:'var(--sf2)', bd:'var(--bd)'};
+  if (!_katColorMap[kat]) {
+    var idx = Object.keys(_katColorMap).length % _KAT_COLORS.length;
+    _katColorMap[kat] = _KAT_COLORS[idx];
+  }
+  return _katColorMap[kat];
+}
+
+// ── SYNC KATEGORI FILTER DROPDOWN ────────────────────────────────
+// Rebuild otomatis dari data DOCS yang sudah ada
+function _syncDocKatFilter() {
+  var sel = document.getElementById('docFiltKat');
+  if (!sel) return;
+  var docs = typeof DOCS !== 'undefined' ? DOCS : [];
+  var existing = sel.value; // simpan pilihan aktif
+
+  // Kumpulkan kategori unik dari data
+  var cats = [];
+  docs.forEach(function(d) {
+    if (d.kategori && cats.indexOf(d.kategori) === -1) cats.push(d.kategori);
+  });
+  cats.sort();
+
+  // Rebuild options
+  sel.innerHTML = '<option value="">Semua Kategori</option>' +
+    cats.map(function(c) {
+      return '<option value="' + c + '"' + (c === existing ? ' selected' : '') + '>' + c + '</option>';
+    }).join('');
+}
+
 // ================================================================
 //  RENDER TAB DOKUMEN
 // ================================================================
 function renderDocs() {
   _syncDocProjDropdown();
+  _syncDocKatFilter();
 
   var projFilt = (document.getElementById('docFiltProj')?.value || '');
   var katFilt  = (document.getElementById('docFiltKat')?.value  || '');
@@ -190,7 +313,7 @@ function renderDocs() {
   // ── Filter ──
   var docs = (DOCS || []).filter(function(d) {
     if (projFilt && String(d.projId) !== String(projFilt)) return false;
-    if (katFilt  && d.kategori !== katFilt)   return false;
+    if (katFilt  && !(d.kategori || '').toLowerCase().includes(katFilt.toLowerCase())) return false;
     if (statFilt && d.status   !== statFilt)  return false;
     if (srch) {
       var txt = [d.namaDoc, d.nomorDoc, d.kategori, d.status, d.submittedBy, d.approvedBy, d.catatan]
@@ -199,6 +322,9 @@ function renderDocs() {
     }
     return true;
   });
+
+  // ── Update KPI Portfolio Overview ──
+  _updateDocKPI();
 
   // ── Summary badges ──
   var summaryEl = document.getElementById('docSummary');
@@ -210,15 +336,18 @@ function renderDocs() {
     _DOC_STATUS_KEYS.forEach(function(s){ cnt[s] = 0; });
     base.forEach(function(d){ if (cnt[d.status] !== undefined) cnt[d.status]++; });
 
-    summaryEl.innerHTML = _DOC_STATUS_KEYS.map(function(s) {
-      var cfg = _DOC_STATUS_CFG[s];
-      var active = statFilt === s ? 'box-shadow:0 0 0 2px ' + cfg.c + ';' : '';
-      return '<div onclick="document.getElementById(\'docFiltStatus\').value=(\'' + s + '\'===document.getElementById(\'docFiltStatus\').value?\'\':\'' + s + '\');renderDocs()" ' +
-        'style="background:' + cfg.bg + ';border:1px solid ' + cfg.bd + ';border-radius:8px;padding:9px 16px;text-align:center;cursor:pointer;min-width:95px;' + active + '">' +
-        '<div style="font-family:var(--fd);font-size:24px;letter-spacing:1px;color:' + cfg.c + ';line-height:1">' + cnt[s] + '</div>' +
-        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:' + cfg.c + ';opacity:.85;margin-top:3px">' + s + '</div>' +
-        '</div>';
-    }).join('');
+    summaryEl.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:2px">' +
+      _DOC_STATUS_KEYS.map(function(s) {
+        var cfg = _DOC_STATUS_CFG[s];
+        var isActive = statFilt === s;
+        var ring = isActive ? 'box-shadow:0 0 0 2px ' + cfg.c + ';transform:translateY(-1px);' : '';
+        return '<div onclick="document.getElementById(\'docFiltStatus\').value=(\'' + s + '\'===document.getElementById(\'docFiltStatus\').value?\'\':\'' + s + '\');renderDocs()" ' +
+          'style="background:' + cfg.bg + ';border:1px solid ' + cfg.bd + ';border-radius:10px;padding:10px 18px;text-align:center;cursor:pointer;min-width:100px;transition:all .15s;' + ring + '">' +
+          '<div style="font-family:var(--fd);font-size:28px;letter-spacing:1px;color:' + cfg.c + ';line-height:1">' + cnt[s] + '</div>' +
+          '<div style="font-size:8px;text-transform:uppercase;letter-spacing:.7px;color:' + cfg.c + ';opacity:.9;margin-top:4px;font-weight:700">' + s + '</div>' +
+          (isActive ? '<div style="width:20px;height:2px;background:' + cfg.c + ';border-radius:1px;margin:5px auto 0"></div>' : '<div style="height:7px"></div>') +
+          '</div>';
+      }).join('') + '</div>';
   }
 
   // ── Table ──
@@ -236,43 +365,49 @@ function renderDocs() {
     return;
   }
 
-  var rows = docs.map(function(d) {
+  var rows = docs.map(function(d, i) {
+    var cfg = _DOC_STATUS_CFG[d.status] || { c:'var(--mt)', bg:'rgba(100,116,139,.08)', bd:'rgba(100,116,139,.2)' };
+    var katColor = _katColor(d.kategori);
     var linkHtml = d.linkDoc
-      ? '<a href="' + safeStr(d.linkDoc) + '" target="_blank" rel="noopener noreferrer" ' +
-        'style="color:var(--bl);font-size:18px;text-decoration:none" title="' + safeStr(d.linkDoc) + '">🔗</a>'
-      : '<span style="color:var(--bd)">—</span>';
-
-    return '<tr>' +
-      '<td style="color:var(--mt);font-size:10px;white-space:nowrap">' + safeStr(_docProjName(d.projId)) + '</td>' +
-      '<td style="font-weight:600;max-width:210px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:210px" title="' + safeStr(d.namaDoc) + '">' + safeStr(d.namaDoc) + '</div></td>' +
-      '<td style="font-family:var(--fm);font-size:10px;color:var(--mt);white-space:nowrap">' + safeStr(d.nomorDoc || '—') + '</td>' +
-      '<td><span style="background:rgba(59,130,246,.1);color:var(--bl);border-radius:4px;padding:2px 8px;font-size:9px;font-weight:600;white-space:nowrap">' + safeStr(d.kategori || '—') + '</span></td>' +
-      '<td style="text-align:center;font-size:10px;color:var(--mt)">' + safeStr(d.revisi || '—') + '</td>' +
+      ? '<a href="' + safeStr(d.linkDoc) + '" target="_blank" rel="noopener noreferrer" title="Buka dokumen" ' +
+        'style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;background:rgba(59,130,246,.12);color:var(--bl);text-decoration:none;font-size:13px;border:1px solid rgba(59,130,246,.25)">🔗</a>'
+      : '';
+    var proj = _docProjName(d.projId);
+    return '<tr style="border-bottom:1px solid rgba(30,45,69,.4);transition:background .12s" ' +
+      'onmouseover="this.style.background=\'rgba(59,130,246,.04)\'" ' +
+      'onmouseout="this.style.background=\'\'">' +
+      '<td style="width:24px;text-align:center;color:var(--mt);font-size:9px;font-family:var(--fm);padding:0 4px 0 10px">' + (i+1) + '</td>' +
+      '<td style="white-space:nowrap"><span style="font-size:9px;font-weight:700;letter-spacing:.3px;padding:2px 7px;border-radius:4px;background:rgba(249,115,22,.1);color:var(--or);border:1px solid rgba(249,115,22,.2)">' + safeStr(proj) + '</span></td>' +
+      '<td style="font-weight:600;max-width:220px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.namaDoc) + '">' + safeStr(d.namaDoc) + '</div>' +
+      (d.catatan ? '<div style="font-size:9px;color:var(--mt);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.catatan) + '">' + safeStr(d.catatan) + '</div>' : '') +
+      '</td>' +
+      '<td style="font-family:var(--fm);font-size:10px;color:var(--bl);white-space:nowrap">' + safeStr(d.nomorDoc || '—') + '</td>' +
+      '<td><span style="background:' + katColor.bg + ';color:' + katColor.c + ';border:1px solid ' + katColor.bd + ';border-radius:5px;padding:2px 8px;font-size:9px;font-weight:600;white-space:nowrap">' + safeStr(d.kategori || '—') + '</span></td>' +
+      '<td style="text-align:center"><span style="font-size:9px;font-family:var(--fm);background:var(--sf2);color:var(--mt);padding:2px 6px;border-radius:4px">' + safeStr(d.revisi || '—') + '</span></td>' +
       '<td style="font-size:10px;white-space:nowrap;color:var(--mt)">' + _fmtDocDate(d.tglDoc) + '</td>' +
       '<td>' + _docBadge(d.status) + '</td>' +
-      '<td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.submittedBy || '') + '">' + safeStr(d.submittedBy || '—') + '</td>' +
-      '<td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.approvedBy || '') + '">' + safeStr(d.approvedBy || '—') + '</td>' +
-      '<td style="font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.catatan || '') + '">' + safeStr(d.catatan || '—') + '</td>' +
+      '<td style="font-size:10px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.submittedBy||'') + '">' + (d.submittedBy ? '<span style="color:var(--tx)">' + safeStr(d.submittedBy) + '</span>' : '<span style="color:var(--bd)">—</span>') + '</td>' +
+      '<td style="font-size:10px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + safeStr(d.approvedBy||'') + '">' + (d.approvedBy ? '<span style="color:var(--gn)">' + safeStr(d.approvedBy) + '</span>' : '<span style="color:var(--bd)">—</span>') + '</td>' +
       '<td style="text-align:center">' + linkHtml + '</td>' +
-      '<td><button class="btn btn-sm edit-only" style="padding:2px 7px" onclick="openDocModal(\'' + d.id + '\')">✏</button></td>' +
+      '<td style="text-align:right;padding-right:10px"><button class="btn btn-sm edit-only" style="padding:2px 9px;font-size:10px;border-color:var(--bd)" onclick="openDocModal(\'' + d.id + '\')">✏ Edit</button></td>' +
       '</tr>';
   }).join('');
 
   tableEl.innerHTML =
-    '<table class="tbl" style="min-width:1150px;table-layout:auto">' +
-    '<thead><tr>' +
-    '<th>Project</th>' +
-    '<th>Nama Dokumen</th>' +
-    '<th>No. Dokumen</th>' +
-    '<th>Kategori</th>' +
-    '<th style="text-align:center">Rev</th>' +
-    '<th>Tanggal</th>' +
-    '<th>Status</th>' +
-    '<th>Submitted By</th>' +
-    '<th>Approved By</th>' +
-    '<th>Catatan</th>' +
-    '<th style="text-align:center">Link</th>' +
-    '<th></th>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+    '<thead><tr style="background:var(--sf2);border-bottom:2px solid var(--bd)">' +
+    '<th style="width:24px;padding:8px 4px 8px 10px"></th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700;white-space:nowrap">Project</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700">Nama Dokumen</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700;white-space:nowrap">No. Dokumen</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700">Kategori</th>' +
+    '<th style="padding:8px 10px;text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700">Rev</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700">Tanggal</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700">Status</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700;white-space:nowrap">Submitted By</th>' +
+    '<th style="padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700;white-space:nowrap">Approved By</th>' +
+    '<th style="padding:8px 10px;text-align:center;font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700">Link</th>' +
+    '<th style="padding:8px 10px"></th>' +
     '</tr></thead>' +
     '<tbody>' + rows + '</tbody>' +
     '</table>';
@@ -410,7 +545,7 @@ function exportDocsPDF() {
 
   var docs = (DOCS || []).filter(function(d) {
     if (projFilt && String(d.projId) !== String(projFilt)) return false;
-    if (katFilt  && d.kategori !== katFilt)   return false;
+    if (katFilt  && !(d.kategori || '').toLowerCase().includes(katFilt.toLowerCase())) return false;
     if (statFilt && d.status   !== statFilt)  return false;
     if (srch) {
       var txt = [d.namaDoc, d.nomorDoc, d.kategori, d.status, d.submittedBy, d.approvedBy, d.catatan]
