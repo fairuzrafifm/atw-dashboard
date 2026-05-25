@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // SUPABASE FULL MIGRATION PATCH v1.0
 // Menggantikan semua GSheet sync dengan Supabase
 // Append sebelum </body> — jangan hapus script di atasnya
@@ -565,6 +565,25 @@
     const nodes = WBS.filter(w => String(w.projId) === String(projId));
     if (nodes.length) await _sbPersist('wbs_bulk', 'save', nodes);
   };
+
+  // saveDrInput — Input Harian
+  const _orig_saveDrInput = window.saveDrInput;
+  if (_orig_saveDrInput) {
+    window.saveDrInput = async function () {
+      const projId = document.getElementById('drInputProj')?.value || '';
+      _orig_saveDrInput.call(this);
+      if (!projId) return;
+      // Simpan semua WBS node project ini (dailyLogs, weeklyData, cumActual terupdate)
+      const nodes = WBS.filter(w => String(w.projId) === String(projId));
+      if (nodes.length) await _sbPersist('wbs_bulk', 'save', nodes);
+      // Simpan project (actual progress terupdate)
+      const proj = P.find(p => String(p.id) === String(projId));
+      if (proj) await _sbPersist('project', 'save', proj);
+      // Simpan S-Curve jika ada
+      const sc = SCURVE.find(s => String(s.projId) === String(projId));
+      if (sc) await _sbPersist('scurve', 'save', sc);
+    };
+  }
 
   // saveAllDailyLogs (bulk)
   const _orig_saveAllDailyLogs = window.saveAllDailyLogs;
