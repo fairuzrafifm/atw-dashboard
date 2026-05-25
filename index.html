@@ -328,6 +328,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 /* Tab slide-in */
 @keyframes tabSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .tp.active>*{animation:tabSlideIn .22s cubic-bezier(.34,1.2,.64,1)}
+/* theme switching via body opacity — lihat toggleTheme() di core.js */
 
 /* CARDS */
 .card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:13px}
@@ -593,11 +594,25 @@ select.fi{color-scheme:dark}
 .gs-info{background:rgba(45,122,181,.07);border:1px solid rgba(45,122,181,.25);border-radius:8px;padding:11px;margin-bottom:12px;font-size:11px;line-height:1.7;color:var(--mt)}
 
 /* TOAST */
-.toast{position:fixed;bottom:16px;right:16px;padding:10px 16px;border-radius:8px;font-weight:600;font-size:12px;z-index:500;transform:translateY(50px);opacity:0;transition:all .25s;pointer-events:none;max-width:320px}
-.toast.show{transform:none;opacity:1}
-.toast.success{background:var(--gn);color:#fff}
-.toast.error{background:var(--rd);color:#fff}
-.toast.warn{background:var(--yw);color:#000}
+.toast{position:fixed;bottom:20px;right:20px;z-index:9100;
+  display:flex;align-items:center;gap:10px;
+  padding:11px 15px;border-radius:10px;border:1px solid transparent;
+  font-size:12.5px;font-weight:500;max-width:340px;min-width:200px;
+  box-shadow:0 8px 28px rgba(0,0,0,.3);pointer-events:none;
+  transform:translateX(calc(100% + 32px));opacity:0;
+  transition:transform .32s cubic-bezier(.34,1.4,.64,1),opacity .25s ease}
+.toast.show{transform:translateX(0);opacity:1;pointer-events:auto}
+/* 4 tipe dengan warna berbeda */
+.toast.t-success{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.4);color:var(--gn)}
+.toast.t-error  {background:rgba(239,68,68,.12) ;border-color:rgba(239,68,68,.4) ;color:var(--rd)}
+.toast.t-warn   {background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:var(--yw)}
+.toast.t-info   {background:rgba(59,130,246,.12) ;border-color:rgba(59,130,246,.4) ;color:var(--bl)}
+/* Light mode override */
+:root.light .toast{box-shadow:0 8px 28px rgba(0,0,0,.15)}
+:root.light .toast.t-success{background:rgba(16,185,129,.1) ;color:#0a7a54}
+:root.light .toast.t-error  {background:rgba(239,68,68,.1)  ;color:#b91c1c}
+:root.light .toast.t-warn   {background:rgba(245,158,11,.1) ;color:#92570a}
+:root.light .toast.t-info   {background:rgba(59,130,246,.1) ;color:#1d4ed8}
 
 .empty{text-align:center;padding:38px 20px;color:var(--mt)}
 
