@@ -5112,58 +5112,67 @@ async function _rtPoll(){
     }
     _rtLastTs=gTs;
 
-    // Smart merge \u2014 semua collection
-    const prevProjCount=P.length;
-    const prevProcCount=PROC.length;
-
-    P=sanitizeProjects(d.projects);
-    try{
-      const lc=JSON.parse(localStorage.getItem('atw_logos')||'{}');
-      P.forEach(p=>{if(!p.logo&&(lc[p.id]||lc[String(p.id)]))p.logo=lc[p.id]||lc[String(p.id)];});
-    }catch(ex){}
-
-    ISS=sanitizeIssues(d.issues);
-
-    // Merge PROC by id
-    const remP=sanitizeProc(d.procurement);
-    const pm=new Map();
-    PROC.forEach(p=>pm.set(String(p.id),p));
-    remP.forEach(p=>pm.set(String(p.id),p));
-    PROC=[...pm.values()];
-
-    MPLOGS=sanitizeMpLogs(d.manpowerLogs);
-    ACCLOGS=sanitizeAccLogs(d.accidentLogs);COSTS=sanitizeCosts(d.costs||[]);
-    RAB=sanitizeRab(d.rab||[]);
-
-    if(d.history){
-      d.history.forEach(h=>{
-        const p=P.find(x=>x.id==h.projId);
-        if(p){if(!p.history)p.history=[];
-          if(!p.history.find(x=>x.date===h.date&&x.actual===h.actual))p.history.push(h);}
-      });
-    }
-
-    // Merge WBS by id
-    if(Array.isArray(d.wbs)&&d.wbs.length){
-      const wm=new Map();
-      WBS.forEach(w=>wm.set(String(w.id),w));
-      d.wbs.forEach(w=>wm.set(String(w.id),w));
-      WBS=[...wm.values()];
-      syncAllWbsToProjects();
-    }
-
-    if(Array.isArray(d.scurve)){
-      SCURVE=d.scurve.map(s=>({
-        projId:s.projId,week:+s.week||0,
-        wPlan:+s.wPlan||0,wAct:+s.wAct||0,
-        cPlan:s.cPlan!=null?+s.cPlan:null,
-        cAct:s.cAct!=null?+s.cAct:null,
-        dateStart:String(s.dateStart||''),fromWbs:s.fromWbs===true||s.fromWbs==='true'||s.fromWbs===1
-      }));
-    }
-
-    selId=selId||(P[0]?.id||null);
-    saveLocal(gTs||Date.now(),true); // data dari GSheet poll
+    // ================================================================
+    // PROTEKSI DATA: Jangan update data lokal jika user sedang edit
+    // (isDirty=true = ada perubahan lokal belum tersimpan)
+    // Berlaku untuk SEMUA modul: WBS, Cost, Manpower, Procurement, dll
+    // ================================================================
+    if(!isDirty){
+      // Smart merge \u2014 semua collection
+      const prevProjCount=P.length;
+      const prevProcCount=PROC.length;
+  
+      P=sanitizeProjects(d.projects);
+      try{
+        const lc=JSON.parse(localStorage.getItem('atw_logos')||'{}');
+        P.forEach(p=>{if(!p.logo&&(lc[p.id]||lc[String(p.id)]))p.logo=lc[p.id]||lc[String(p.id)];});
+      }catch(ex){}
+  
+      ISS=sanitizeIssues(d.issues);
+  
+      // Merge PROC by id
+      const remP=sanitizeProc(d.procurement);
+      const pm=new Map();
+      PROC.forEach(p=>pm.set(String(p.id),p));
+      remP.forEach(p=>pm.set(String(p.id),p));
+      PROC=[...pm.values()];
+  
+      MPLOGS=sanitizeMpLogs(d.manpowerLogs);
+      ACCLOGS=sanitizeAccLogs(d.accidentLogs);COSTS=sanitizeCosts(d.costs||[]);
+      RAB=sanitizeRab(d.rab||[]);
+  
+      if(d.history){
+        d.history.forEach(h=>{
+          const p=P.find(x=>x.id==h.projId);
+          if(p){if(!p.history)p.history=[];
+            if(!p.history.find(x=>x.date===h.date&&x.actual===h.actual))p.history.push(h);}
+        });
+      }
+  
+      // Merge WBS by id — skip item yg baru saja dihapus lokal
+      if(Array.isArray(d.wbs)&&d.wbs.length){
+        const deleted=window._wbsRecentDeleted||new Set();
+        const wm=new Map();
+        WBS.forEach(w=>wm.set(String(w.id),w));
+        // Remote data tidak boleh restore item yg baru saja dihapus lokal
+        d.wbs.filter(w=>!deleted.has(String(w.id))).forEach(w=>wm.set(String(w.id),w));
+        WBS=[...wm.values()].filter(w=>!deleted.has(String(w.id)));
+        syncAllWbsToProjects();
+      }
+  
+      if(Array.isArray(d.scurve)){
+        SCURVE=d.scurve.map(s=>({
+          projId:s.projId,week:+s.week||0,
+          wPlan:+s.wPlan||0,wAct:+s.wAct||0,
+          cPlan:s.cPlan!=null?+s.cPlan:null,
+          cAct:s.cAct!=null?+s.cAct:null,
+          dateStart:String(s.dateStart||''),fromWbs:s.fromWbs===true||s.fromWbs==='true'||s.fromWbs===1
+        }));
+      }
+  
+      selId=selId||(P[0]?.id||null);
+      saveLocal(gTs||Date.now(),true); // data dari GSheet poll
+    } // end if(!isDirty)
 
     // Apply dash_logo dari GSheet jika ada dan berbeda dari yang di localStorage
     if(d.dash_logo&&d.dash_logo.startsWith('data:')){
