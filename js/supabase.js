@@ -524,6 +524,7 @@ function mapWbs(r) {
     // Daily Report fields
     qtyPlan:   r.qty_plan   != null ? +r.qty_plan : 0,
     satuan:    r.satuan     || '',
+    qtySatuan: r.satuan     || '',   // alias agar daily.js & wbs.js kompatibel
     dailyLogs: Array.isArray(r.daily_logs) ? r.daily_logs : (r.daily_logs ? JSON.parse(r.daily_logs) : [])
   };
 }
@@ -538,7 +539,7 @@ function unmapWbs(w) {
     weekly_data: w.weeklyData || {}, weekly_plan: w.weeklyPlan || {},
     // Daily Report fields — simpan ke Supabase
     qty_plan:   w.qtyPlan   != null ? +w.qtyPlan  : 0,
-    satuan:     w.satuan    || '',
+    satuan:     w.satuan    || w.qtySatuan || '',   // support dua alias
     daily_logs: w.dailyLogs || []
   };
 }
