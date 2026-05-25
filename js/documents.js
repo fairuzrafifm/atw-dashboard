@@ -187,9 +187,11 @@ function _syncDocProjDropdown(id) {
         '</option>';
     }).join('');
 
-  // Set value ke project aktif sidebar (selId dari core.js)
-  var activeId = id || (typeof selId !== 'undefined' && selId ? String(selId) : '');
-  if (activeId) sel.value = activeId;
+  // Hanya auto-sync ke sidebar jika user BELUM set filter manual
+  if (!sel._docFiltManual) {
+    var activeId = id || (typeof selId !== 'undefined' && selId ? String(selId) : '');
+    if (activeId) sel.value = activeId;
+  }
 
   // Juga sync modal project dropdown
   var mSel = document.getElementById('docModalProj');
@@ -320,7 +322,8 @@ function renderDocs() {
   _syncDocProjDropdown();
   _syncDocKatFilter();
 
-  var projFilt = (document.getElementById('docFiltProj')?.value || '');
+  var projEl  = document.getElementById('docFiltProj');
+  var projFilt = (projEl?.value || '');
   var katFilt  = (document.getElementById('docFiltKat')?.value  || '');
   var statFilt = (document.getElementById('docFiltStatus')?.value || '');
   var srch     = (document.getElementById('docSearch')?.value || '').toLowerCase().trim();
