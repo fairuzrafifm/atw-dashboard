@@ -304,15 +304,30 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 .tp{display:none}.tp.active{display:contents}
 
 /* KPI */
-.krow{display:grid;gap:9px}
-.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:12px 13px;position:relative;overflow:hidden}
-.kpi:hover{transform:translateY(-1px)}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.krow{display:grid;gap:9px;perspective:900px}
+.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:12px 13px;position:relative;overflow:hidden;cursor:pointer;
+  transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease,border-color .2s ease;
+  transform-style:preserve-3d;will-change:transform,box-shadow}
+.kpi:hover{transform:perspective(600px) translateZ(14px) rotateX(6deg);
+  box-shadow:0 16px 40px rgba(0,0,0,.35),0 6px 16px rgba(0,0,0,.2);border-color:rgba(255,255,255,.12)}
+.kpi:active{transform:perspective(600px) translateZ(3px) rotateX(0deg) scale(0.97);
+  box-shadow:0 4px 12px rgba(0,0,0,.2);transition-duration:.08s,.08s,.08s}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;transition:height .2s ease}
+.kpi:hover::before{height:3px}
 .ko::before{background:var(--or)}.kg::before{background:var(--gn)}.kb::before{background:var(--bl)}
 .ky::before{background:var(--yw)}.kr::before{background:var(--rd)}.kp::before{background:var(--pu)}
 .kl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mt);margin-bottom:3px}
-.kv{font-family:var(--fd);font-size:22px;letter-spacing:1px;line-height:1}
+.kv{font-family:var(--fd);font-size:22px;letter-spacing:1px;line-height:1;transition:color .3s ease}
 .ks{font-size:10px;color:var(--mt);margin-top:2px}
+/* Skeleton shimmer */
+@keyframes kpiShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.kv.skel{color:transparent!important;background:linear-gradient(90deg,var(--sf2) 25%,var(--bd) 50%,var(--sf2) 75%);background-size:200% 100%;animation:kpiShimmer 1.2s infinite;border-radius:4px;min-width:40px;display:inline-block}
+/* KPI updated flash */
+@keyframes kpiFlash{0%{opacity:.4}50%{opacity:1}100%{opacity:1}}
+.kv.flash{animation:kpiFlash .4s ease}
+/* Tab slide-in */
+@keyframes tabSlideIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.tp.active>*{animation:tabSlideIn .22s cubic-bezier(.34,1.2,.64,1)}
 
 /* CARDS */
 .card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:13px}
@@ -747,9 +762,9 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
     <div id="tp-overview" class="tp active">
       <!-- KPI TOP ROW: 6 cards -->
       <div class="krow" style="grid-template-columns:repeat(6,1fr)">
-        <div class="kpi ko"><div class="kl">Total Projects</div><div class="kv" id="ov1" style="color:var(--or)">0</div><div class="ks">Active portfolio</div></div>
-        <div class="kpi kb"><div class="kl">Total Manhours Hari Ini</div><div class="kv" id="ov2" style="color:var(--bl)">0</div><div class="ks" id="ov2s">Plan: 0 jam</div></div>
-        <div class="kpi" style="background:var(--sf);border-color:var(--bd)">
+        <div class="kpi ko" onclick="const te=document.querySelector('.tab[onclick*=\'projects\']');if(te)sw('projects',te)" title="🗂 Buka tab Projects"><div class="kl">Total Projects</div><div id="ov1" class="kv skel" style="color:var(--or)">0</div><div class="ks">Active portfolio</div></div>
+        <div class="kpi kb" onclick="const te=document.querySelector('.tab[onclick*=\'manpower\']');if(te)sw('manpower',te)" title="👷 Buka tab Manpower"><div class="kl">Total Manhours Hari Ini</div><div id="ov2" class="kv skel" style="color:var(--bl)">0</div><div class="ks" id="ov2s">Plan: 0 jam</div></div>
+        <div class="kpi" style="background:var(--sf);border-color:var(--bd)" onclick="const te=document.querySelector('.tab[onclick*=\'projects\']');if(te)sw('projects',te)" title="📊 Buka tab Projects">
           <div class="kl">Status Portfolio</div>
           <div style="display:flex;gap:8px;align-items:baseline;margin-top:4px;flex-wrap:wrap">
             <span><span style="font-family:var(--fd);font-size:20px;color:var(--gn)" id="ovOT">0</span><span style="font-size:9px;color:var(--gn);margin-left:3px">OT</span></span>
@@ -757,11 +772,11 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
             <span><span style="font-family:var(--fd);font-size:20px;color:var(--rd)" id="ovCR">0</span><span style="font-size:9px;color:var(--rd);margin-left:3px">CRIT</span></span>
           </div>
         </div>
-        <div class="kpi kr"><div class="kl">Open Issues</div><div class="kv" id="ov4" style="color:var(--rd)">0</div><div class="ks">All projects</div></div>
-        <div class="kpi ky"><div class="kl">Total Time Lost</div><div class="kv" id="ov5" style="color:var(--yw)">0 hr</div><div class="ks">Acc + Weather</div></div>
-        <div class="kpi" style="border-top:3px solid var(--gn);cursor:pointer" onclick="const te=document.querySelector('.tab[onclick*=\\'cost\\']');if(te)sw('cost',te)" title="Klik untuk detail">
+        <div class="kpi kr" onclick="const te=document.querySelector('.tab[onclick*=\'issues\']');if(te)sw('issues',te)" title="⚠ Buka tab Issues"><div class="kl">Open Issues</div><div id="ov4" class="kv skel" style="color:var(--rd)">0</div><div class="ks">All projects</div></div>
+        <div class="kpi ky" onclick="const te=document.querySelector('.tab[onclick*=\'manpower\']');if(te)sw('manpower',te)" title="⏱ Buka tab Manpower"><div class="kl">Total Time Lost</div><div id="ov5" class="kv skel" style="color:var(--yw)">0 hr</div><div class="ks">Acc + Weather</div></div>
+        <div class="kpi kg" onclick="const te=document.querySelector('.tab[onclick*=\'cost\']');if(te)sw('cost',te)" title="💰 Buka tab Cost/Finance">
           <div class="kl">Total Pengeluaran</div>
-          <div class="kv" id="ov6" style="color:var(--gn);font-size:15px">Rp 0</div>
+          <div id="ov6" class="kv skel" style="color:var(--gn);font-size:15px">Rp 0</div>
           <div class="ks" id="ov6s">Procurement + OPEX</div>
         </div>
       </div>
