@@ -124,24 +124,68 @@ function generateMpReport(){
   const oldC=document.getElementById('mpRCloseBtn');if(oldC)oldC.remove();
   const oldP=document.getElementById('mpRPrintBtn');if(oldP)oldP.remove();
 
+  // Ambil logo dari localStorage atau dashLogoImg
+  let _pdfLogo=''; try{_pdfLogo=localStorage.getItem('atw_dash_logo')||'';}catch(e){}
+  if(!_pdfLogo){const _li=$('dashLogoImg');if(_li&&_li.src&&_li.src.startsWith('data:'))_pdfLogo=_li.src;}
+  const _mpPrintDate=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Manpower Report — ${proj?.kode||'All Projects'}</title>
+    <title>Manpower Report — \${proj?.kode||'All Projects'}</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:11px}
-      @media print{body{padding:0}@page{margin:12mm;size:A4}.pb{page-break-before:always;break-before:page}}
-      .pb{page-break-before:always;break-before:page}
+      body{font-family:Arial,sans-serif;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10.5px}
+      .pdf-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1e293b;color:#f1f5f9;border-radius:6px 6px 0 0;margin-bottom:12px}
+      .pdf-hdr-left{display:flex;align-items:center;gap:12px}
+      .pdf-hdr-logo{height:34px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
+      .pdf-hdr-title{font-size:12px;font-weight:700;letter-spacing:.3px}
+      .pdf-hdr-sub{font-size:9px;color:#94a3b8;margin-top:2px}
+      .pdf-hdr-right{text-align:right;font-size:9px;color:#94a3b8}
+      .pdf-hdr-right strong{display:block;font-size:11px;color:#f1f5f9;margin-bottom:2px}
+      .pdf-ftr{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#9ca3af}
       table{width:100%;border-collapse:collapse;font-size:10px}
-      th{background:#1e293b;color:#f1f5f9;padding:5px 8px;text-align:left;font-size:9px;letter-spacing:.5px}
+      th{background:#1e293b;color:#f1f5f9;padding:5px 8px;text-align:left;font-size:8.5px;letter-spacing:.5px}
       th.r,td.r{text-align:center}
-      td{padding:4px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+      td{padding:3px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
       tr:nth-child(even) td{background:#f8fafc}
-      .kat-row td{background:#f1f5f9;font-weight:700;font-size:10px;color:#1e40af;padding:6px 8px}
-      .sub-row td{background:#fefce8;font-size:9px;padding:3px 8px;color:#374151}
-      .total-row td{background:#1e293b;color:#f1f5f9;font-weight:700;padding:6px 8px}
+      .kat-row td{background:#dbeafe;font-weight:700;font-size:9px;color:#1e40af;padding:5px 8px}
+      .sub-row td{background:#fefce8;font-size:8.5px;padding:2px 8px;color:#374151}
+      .total-row td{background:#1e293b;color:#f1f5f9;font-weight:700;padding:5px 8px}
       .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:600}
+      @media print{
+        @page{size:A4 landscape;margin:28mm 12mm 18mm 12mm}
+        body{padding:0}
+        .pdf-hdr{position:fixed;top:0;left:0;right:0;height:24mm;display:flex!important;align-items:center;justify-content:space-between;padding:4mm 12mm;margin-bottom:0;border-radius:0;background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
+        .pdf-ftr{position:fixed;bottom:0;left:0;right:0;height:14mm;display:flex!important;align-items:center;justify-content:space-between;padding:0 12mm;margin-top:0;border-top:2px solid #1e293b;background:#fff!important;font-size:8px;color:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
+        .pdf-body{margin-top:26mm;margin-bottom:16mm}
+        .pb{page-break-before:always;break-before:page}
+        th{background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .kat-row td{background:#dbeafe!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .sub-row td{background:#fefce8!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .total-row td{background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        tr:nth-child(even) td{background:#f8fafc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        tr{break-inside:avoid;page-break-inside:avoid}
+        thead{display:table-header-group}
+      }
     </style>
-  </head><body>${html}</body></html>`;
+  </head><body>
+  <div class="pdf-hdr">
+    <div class="pdf-hdr-left">
+      <img class="pdf-hdr-logo" src="\${_pdfLogo}" alt="ATW Solar" onerror="this.style.display='none'">
+      <div>
+        <div class="pdf-hdr-title">ATW SOLAR — PROJECT PERFORMANCE DASHBOARD</div>
+        <div class="pdf-hdr-sub">Manpower Report &mdash; \${proj?.kode||'All Projects'}</div>
+      </div>
+    </div>
+    <div class="pdf-hdr-right">
+      <strong>\${proj?.name||'All Projects'}</strong>
+      <span>Periode: \${periodLabel}</span>
+    </div>
+  </div>
+  <div class="pdf-ftr">
+    <span>ATW Solar &mdash; Project Performance Dashboard</span>
+    <span>Dicetak: \${_mpPrintDate}</span>
+  </div>
+  <div class="pdf-body">\${html}</div>
+  </body></html>`;
 
   const iframe=document.createElement('iframe');
   iframe.id='mpReportFrame';
@@ -402,18 +446,65 @@ function generateWeeklyReport(){
   const oldC=document.getElementById('wrCloseBtn');if(oldC)oldC.remove();
   const oldP=document.getElementById('wrPrintBtn');if(oldP)oldP.remove();
 
+  // Ambil logo
+  let _wrLogo=''; try{_wrLogo=localStorage.getItem('atw_dash_logo')||'';}catch(e){}
+  if(!_wrLogo){const _wli=$('dashLogoImg');if(_wli&&_wli.src&&_wli.src.startsWith('data:'))_wrLogo=_wli.src;}
+  const _wrPrintDate=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const _wrProj=P.find(p=>String(p.id)===String(projId));
   const fullHtml=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Weekly Report W${String(week).padStart(2,'0')}</title>
+    <title>Weekly Report W\${String(week).padStart(2,'0')}</title>
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-      @media print{body{padding:0}@page{margin:12mm;size:A4}.wr-pb{page-break-before:always;break-before:page}}
-      .wr-pb{page-break-before:always;break-before:page}
-      thead{display:table-header-group}
-      tfoot{display:table-footer-group}
-      tr{break-inside:avoid;page-break-inside:avoid}
+      body{font-family:Arial,sans-serif;color:#1e293b;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:10.5px}
+      .pdf-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1e293b;color:#f1f5f9;border-radius:6px 6px 0 0;margin-bottom:14px}
+      .pdf-hdr-left{display:flex;align-items:center;gap:12px}
+      .pdf-hdr-logo{height:34px;object-fit:contain;background:#fff;border-radius:4px;padding:2px}
+      .pdf-hdr-title{font-size:12px;font-weight:700;letter-spacing:.3px}
+      .pdf-hdr-sub{font-size:9px;color:#94a3b8;margin-top:2px}
+      .pdf-hdr-right{text-align:right;font-size:9px;color:#94a3b8}
+      .pdf-hdr-right strong{display:block;font-size:11px;color:#f1f5f9;margin-bottom:2px}
+      .pdf-ftr{display:flex;align-items:center;justify-content:space-between;margin-top:16px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:8px;color:#9ca3af}
+      .wr-sec{margin-bottom:16px}
+      .wr-sec-title{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#f97316;border-bottom:1px solid #fed7aa;padding-bottom:3px;margin-bottom:8px}
+      table{width:100%;border-collapse:collapse;font-size:9.5px}
+      th{background:#1e293b;color:#f1f5f9;padding:4px 7px;text-align:left;font-size:8.5px;letter-spacing:.4px}
+      th.r,td.r{text-align:center}
+      td{padding:3px 7px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+      tr:nth-child(even) td{background:#f8fafc}
+      @media print{
+        @page{size:A4 landscape;margin:28mm 12mm 18mm 12mm}
+        body{padding:0}
+        .pdf-hdr{position:fixed;top:0;left:0;right:0;height:24mm;display:flex!important;align-items:center;justify-content:space-between;padding:4mm 12mm;margin-bottom:0;border-radius:0;background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
+        .pdf-ftr{position:fixed;bottom:0;left:0;right:0;height:14mm;display:flex!important;align-items:center;justify-content:space-between;padding:0 12mm;margin-top:0;border-top:2px solid #1e293b;background:#fff!important;font-size:8px;color:#6b7280;-webkit-print-color-adjust:exact;print-color-adjust:exact;z-index:9999}
+        .pdf-body{margin-top:26mm;margin-bottom:16mm}
+        .wr-pb{page-break-before:always;break-before:page}
+        th{background:#1e293b!important;color:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        tr:nth-child(even) td{background:#f8fafc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        tr{break-inside:avoid;page-break-inside:avoid}
+        thead{display:table-header-group}
+        tfoot{display:table-footer-group}
+      }
     </style>
-  </head><body>${html}</body></html>`;
+  </head><body>
+  <div class="pdf-hdr">
+    <div class="pdf-hdr-left">
+      <img class="pdf-hdr-logo" src="\${_wrLogo}" alt="ATW Solar" onerror="this.style.display='none'">
+      <div>
+        <div class="pdf-hdr-title">ATW SOLAR — PROJECT PERFORMANCE DASHBOARD</div>
+        <div class="pdf-hdr-sub">Weekly Report — Week \${String(week).padStart(2,'0')}</div>
+      </div>
+    </div>
+    <div class="pdf-hdr-right">
+      <strong>\${_wrProj?.kode||''} \${_wrProj?.name||''}</strong>
+      <span>Week \${String(week).padStart(2,'0')} / \${new Date().getFullYear()}</span>
+    </div>
+  </div>
+  <div class="pdf-ftr">
+    <span>ATW Solar &mdash; Project Performance Dashboard</span>
+    <span>Dicetak: \${_wrPrintDate}</span>
+  </div>
+  <div class="pdf-body">\${html}</div>
+  </body></html>`;
 
   const iframe=document.createElement('iframe');
   iframe.id='weeklyPrintFrame';
