@@ -1,4 +1,4 @@
-﻿
+
   // ============================================================
 // ATW Dashboard - Feature Patch
 // Tambahkan kode ini SEBELUM tag </body> di index.html
@@ -143,15 +143,18 @@
       m.id = '_userPanel';
       m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:9999999';
       m.innerHTML = `
-        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:12px;padding:24px;width:580px;max-width:95vw;max-height:85vh;overflow-y:auto">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-            <h3 style="font-family:var(--fd);letter-spacing:2px;font-size:15px">KELOLA USER</h3>
-            <button class="btn btn-sm" onclick="document.getElementById('_userPanel').style.display='none'">✕</button>
+        <div style="background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:24px 26px;width:600px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <div>
+              <h3 style="font-family:var(--fd);letter-spacing:2px;font-size:16px;margin:0">KELOLA USER</h3>
+              <div style="font-size:11px;color:var(--mt);margin-top:2px">Manajemen akses & role pengguna</div>
+            </div>
+            <button style="background:transparent;border:1px solid var(--bd);border-radius:8px;color:var(--mt);width:30px;height:30px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .15s" onmouseover="this.style.background='var(--sf2)';this.style.color='var(--tx)'" onmouseout="this.style.background='transparent';this.style.color='var(--mt)'" onclick="document.getElementById('_userPanel').style.display='none'">✕</button>
           </div>
-          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mt);margin-bottom:8px">⏳ Menunggu Persetujuan</div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mt);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="color:var(--yw)">⏳</span> Menunggu Persetujuan</div>
           <div id="_pendingList" style="margin-bottom:18px">Memuat...</div>
-          <hr style="border-color:var(--bd);margin:14px 0">
-          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--mt);margin-bottom:8px">👥 User Aktif</div>
+          <div style="border-top:1px solid var(--bd);margin:16px 0"></div>
+          <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--mt);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span>👥</span> User Aktif</div>
           <div id="_activeList">Memuat...</div>
         </div>`;
       document.body.appendChild(m);
@@ -177,31 +180,47 @@
       ]);
 
       pEl.innerHTML = (pending && pending.length)
-        ? pending.map(u => `
-          <div style="background:var(--sf2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+        ? pending.map(u => {
+            const name = (u.full_name && u.full_name !== '—') ? u.full_name : u.email.split('@')[0];
+            const ini  = name.slice(0,2).toUpperCase();
+            return `
+          <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;border-radius:50%;background:#f59e0b;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0">${ini}</div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:500">${u.full_name || '—'}</div>
-              <div style="font-size:11px;color:var(--mt)">${u.email} · minta: <b style="color:var(--bl)">${u.requested_role || 'editor'}</b></div>
+              <div style="font-size:13px;font-weight:600;color:var(--tx)">${name}</div>
+              <div style="font-size:11px;color:var(--mt)">${u.email} · minta: <span style="color:var(--bl);font-weight:600">${u.requested_role || 'editor'}</span></div>
             </div>
-            <button class="btn btn-sm bg" onclick="_patchApprove('${u.id}','${u.requested_role||'editor'}')">✓ Setuju</button>
-            <button class="btn btn-sm brd" onclick="_patchReject('${u.id}')">✕ Tolak</button>
-          </div>`).join('')
-        : '<div style="font-size:12px;color:var(--mt);padding:6px">Tidak ada pendaftaran baru ✓</div>';
+            <button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--gn);border:1px solid rgba(16,185,129,.3);font-size:11px;padding:4px 10px;border-radius:6px" onclick="_patchApprove('${u.id}','${u.requested_role||'editor'}')">✓ Setuju</button>
+            <button class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--rd);border:1px solid rgba(239,68,68,.25);font-size:11px;padding:4px 10px;border-radius:6px" onclick="_patchReject('${u.id}')">✕ Tolak</button>
+          </div>`;
+          }).join('')
+        : '<div style="font-size:12px;color:var(--mt);padding:6px 0">Tidak ada pendaftaran baru ✓</div>';
 
+      const _roleConf = {
+        admin:  { bg:'rgba(139,92,246,.18)', color:'var(--pu)', label:'Admin',  av:'#8b5cf6' },
+        editor: { bg:'rgba(59,130,246,.18)',  color:'var(--bl)', label:'Editor', av:'#3b82f6' },
+        viewer: { bg:'rgba(16,185,129,.18)', color:'var(--gn)', label:'Viewer', av:'#10b981' }
+      };
       aEl.innerHTML = (active && active.length)
-        ? active.map(u => `
-          <div style="background:var(--sf2);border-radius:8px;padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px">
+        ? active.map(u => {
+            const rc  = _roleConf[u.role] || _roleConf.viewer;
+            const name = (u.full_name && u.full_name !== '—') ? u.full_name : u.email.split('@')[0];
+            const ini  = name.slice(0,2).toUpperCase();
+            return `
+          <div style="background:var(--sf2);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:background .15s" onmouseover="this.style.background='var(--ib)'" onmouseout="this.style.background='var(--sf2)'">
+            <div style="width:38px;height:38px;border-radius:50%;background:${rc.av};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:.5px">${ini}</div>
             <div style="flex:1;min-width:0">
-              <div style="font-size:13px;font-weight:500">${u.full_name || '—'}</div>
+              <div style="font-size:13px;font-weight:600;color:var(--tx);line-height:1.4">${name}</div>
               <div style="font-size:11px;color:var(--mt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
             </div>
-            <span style="font-size:10px;padding:2px 8px;border-radius:10px;flex-shrink:0;background:${u.role==='admin'?'rgba(139,92,246,.15)':u.role==='editor'?'rgba(59,130,246,.15)':'rgba(16,185,129,.15)'};color:${u.role==='admin'?'var(--pu)':u.role==='editor'?'var(--bl)':'var(--gn)'}">${u.role}</span>
-            <select class="fi" style="font-size:11px;padding:3px 6px;flex-shrink:0" onchange="_patchChangeRole('${u.id}',this.value)">
+            <span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:20px;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase;background:${rc.bg};color:${rc.color}">${rc.label}</span>
+            <select style="font-size:11px;padding:4px 8px;border-radius:6px;border:1px solid var(--bd);background:var(--ib);color:var(--tx);flex-shrink:0;cursor:pointer;outline:none;transition:border-color .15s" onchange="_patchChangeRole('${u.id}',this.value)" onfocus="this.style.borderColor='var(--bl)'" onblur="this.style.borderColor='var(--bd)'">
               <option value="admin"  ${u.role==='admin' ?'selected':''}>Admin</option>
               <option value="editor" ${u.role==='editor'?'selected':''}>Editor</option>
               <option value="viewer" ${u.role==='viewer'?'selected':''}>Viewer</option>
             </select>
-          </div>`).join('')
+          </div>`;
+          }).join('')
         : '<div style="font-size:12px;color:var(--mt);padding:6px">Belum ada user aktif</div>';
 
     } catch (e) {
