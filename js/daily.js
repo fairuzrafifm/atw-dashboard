@@ -44,32 +44,70 @@ function renderDailyReport(){
 function renderDrMainTable(projId,date){
   const all=WBS.filter(w=>String(w.projId)===String(projId));
   const cats=all.filter(w=>w.type==='cat').sort((a,b)=>a.order-b.order);
-  if(!cats.length){$('drTable').innerHTML='<div style="text-align:center;color:var(--mt);padding:30px">Setup WBS terlebih dahulu di tab <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M3 6v.01"/><path d="M3 12v.01"/><path d="M3 18v.01"/></svg> WBS</div>';return;}
-  let html=`<table class="tbl"><thead><tr>
-    <th style="width:50px">#</th><th>Item Pekerjaan</th>
-    <th style="width:70px;text-align:right">Bobot</th>
-    <th style="width:80px;text-align:right">Qty Plan</th>
-    <th style="width:90px;text-align:right">Qty Hari Ini</th>
-    <th style="width:80px;text-align:right">Qty Cum.</th>
-    <th style="width:80px;text-align:right">% Selesai</th>
-    <th style="width:80px;text-align:right">Kontribusi</th>
-    <th style="width:60px;text-align:center">Satuan</th>
-  </tr></thead><tbody>`;
+  if(!cats.length){
+    $('drTable').innerHTML='<div style="text-align:center;color:var(--mt);padding:40px 20px;font-size:12px">Setup WBS terlebih dahulu di tab WBS</div>';
+    return;
+  }
+
+  const TH = (label,align,w) =>
+    `<th style="padding:9px ${align==='right'?'14px':'10px'} 9px 10px;text-align:${align||'left'};font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--mt);font-weight:700;white-space:nowrap;background:var(--sf2);border-bottom:2px solid var(--bd)${w?';width:'+w:''}">` + label + '</th>';
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--fb)">'
+    + '<thead><tr>'
+    + TH('#','left','42px')
+    + TH('Item Pekerjaan','left')
+    + TH('Bobot','right','72px')
+    + TH('Qty Plan','right','90px')
+    + TH('Hari Ini','right','90px')
+    + TH('Qty Cum.','right','90px')
+    + TH('% Selesai','right','80px')
+    + TH('Kontribusi','right','84px')
+    + TH('Satuan','center','70px')
+    + '</tr></thead><tbody>';
+
   cats.forEach((cat,ci)=>{
-    const catLeaves=all.filter(w=>(w.type==='item'&&all.some(x=>x.type==='subcat'&&x.parentId===cat.id&&x.id===w.parentId))||(w.type==='subcat'&&w.parentId===cat.id&&!all.some(x=>x.type==='item'&&x.parentId===w.id)));
+    const catLeaves=all.filter(w=>
+      (w.type==='item'&&all.some(x=>x.type==='subcat'&&x.parentId===cat.id&&x.id===w.parentId))||
+      (w.type==='subcat'&&w.parentId===cat.id&&!all.some(x=>x.type==='item'&&x.parentId===w.id))
+    );
     const catKontrib=catLeaves.reduce((s,n)=>s+_drNodeKontrib(n,date),0);
-    html+=`<tr style="background:rgba(59,130,246,.08)"><td style="font-family:var(--fd);font-weight:700;color:var(--bl);font-size:13px">${String.fromCharCode(65+ci)}</td><td style="font-weight:700;color:var(--bl);font-size:12px">${safeStr(cat.name)}</td><td colspan="5"></td><td style="text-align:right;font-family:var(--fm);font-weight:700;color:var(--gn)">${(catKontrib*100).toFixed(2)}%</td><td></td></tr>`;
+    const catPct=catLeaves.reduce((s,n)=>{
+      const qp=+n.qtyPlan||0;const dl=n.dailyLogs||[];
+      const cum=Math.min(qp||999999,dl.filter(l=>l.date<=date).reduce((a,l)=>a+(l.qty!=null?+l.qty:0),0));
+      return s+(qp>0?(cum/qp*+n.bobot/100):((+n.cumActual||0)/100*+n.bobot/100));
+    },0)*100;
+
+    // Progress bar width for category
+    const barW=Math.min(100,catPct).toFixed(1);
+    html+=`<tr style="background:linear-gradient(90deg,rgba(59,130,246,.07) 0%,rgba(59,130,246,.03) 100%);border-top:1px solid rgba(59,130,246,.15);border-bottom:1px solid rgba(59,130,246,.1)">`
+      +`<td style="padding:9px 4px 9px 12px;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--bl);letter-spacing:.5px">${String.fromCharCode(65+ci)}</td>`
+      +`<td style="padding:9px 10px;font-family:var(--fb);font-size:11.5px;font-weight:700;color:var(--bl)">${safeStr(cat.name)}</td>`
+      +`<td colspan="5"></td>`
+      +`<td style="padding:9px 14px 9px 0;text-align:right;font-family:var(--fm);font-size:11px;font-weight:700;color:var(--gn)">${(catKontrib*100).toFixed(2)}%</td>`
+      +`<td></td>`
+      +'</tr>';
+
     all.filter(w=>w.type==='subcat'&&w.parentId===cat.id).sort((a,b)=>a.order-b.order).forEach((sub,si)=>{
       const subItems=all.filter(w=>w.type==='item'&&w.parentId===sub.id).sort((a,b)=>a.order-b.order);
       const isLeaf=subItems.length===0;
-      if(isLeaf){html+=_drNodeRow(`${ci+1}.${si+1}`,sub,date,22);}
-      else{
+      if(isLeaf){
+        html+=_drNodeRow(`${ci+1}.${si+1}`,sub,date,20,false);
+      } else {
         const subKontrib=subItems.reduce((s,x)=>s+_drNodeKontrib(x,date),0);
-        html+=`<tr style="background:rgba(16,185,129,.05)"><td style="padding-left:16px;color:var(--gn);font-weight:600;font-family:var(--fm)">${ci+1}.${si+1}</td><td style="padding-left:22px;color:var(--gn);font-size:12px;font-weight:600">${safeStr(sub.name)}</td><td colspan="5"></td><td style="text-align:right;font-family:var(--fm);font-size:11px;color:var(--gn)">${(subKontrib*100).toFixed(2)}%</td><td></td></tr>`;
-        subItems.forEach((item,ii)=>{ html+=_drNodeRow(`${ci+1}.${si+1}.${ii+1}`,item,date,38); });
+        html+=`<tr style="background:rgba(16,185,129,.04);border-top:1px solid rgba(16,185,129,.1)">`
+          +`<td style="padding:7px 4px 7px 20px;font-family:var(--fm);font-size:10px;color:var(--gn);font-weight:600">${ci+1}.${si+1}</td>`
+          +`<td style="padding:7px 10px;font-family:var(--fb);font-size:11px;font-weight:600;color:var(--gn)">${safeStr(sub.name)}</td>`
+          +`<td colspan="5"></td>`
+          +`<td style="padding:7px 14px 7px 0;text-align:right;font-family:var(--fm);font-size:10.5px;color:var(--gn);font-weight:600">${(subKontrib*100).toFixed(2)}%</td>`
+          +`<td></td>`
+          +'</tr>';
+        subItems.forEach((item,ii)=>{
+          html+=_drNodeRow(`${ci+1}.${si+1}.${ii+1}`,item,date,36,true);
+        });
       }
     });
   });
+
   html+='</tbody></table>';
   $('drTable').innerHTML=html;
 }
@@ -79,25 +117,44 @@ function _drNodeKontrib(node,date){
   const totalQty=Math.min(qtyPlan,(node.dailyLogs||[]).filter(l=>l.date<=date).reduce((s,l)=>s+(l.qty!=null?+l.qty:0),0));
   return (bobot/100)*(totalQty/qtyPlan);
 }
-function _drNodeRow(num,node,date,indent){
-  const qtyPlan=+node.qtyPlan||0;const sat=safeStr(node.qtySatuan)||'';const bobot=+node.bobot||0;
+function _drNodeRow(num,node,date,indent,isDeep){
+  const qtyPlan=+node.qtyPlan||0;
+  const sat=safeStr(node.qtySatuan||node.satuan)||'';
+  const bobot=+node.bobot||0;
   const dl=node.dailyLogs||[];
   const todayLog=dl.find(l=>l.date===date)||{};
   const todayQty=todayLog.qty!=null?+todayLog.qty:0;
   const cumQty=Math.min(qtyPlan||999999,dl.filter(l=>l.date<=date).reduce((s,l)=>s+(l.qty!=null?+l.qty:0),0));
   const pct=qtyPlan>0?Math.min(100,cumQty/qtyPlan*100):(+node.cumActual||0);
   const kontrib=qtyPlan>0?(bobot/100)*(cumQty/qtyPlan):(bobot/100)*(pct/100);
-  const noQty=!qtyPlan;const bg=todayQty>0?'background:rgba(16,185,129,.04)':'';
-  return `<tr style="${bg}"><td style="padding-left:${indent}px;font-size:10px;color:var(--mt)">${num}</td>
-    <td style="padding-left:${indent+8}px;font-size:11px">${safeStr(node.name)}</td>
-    <td style="text-align:right;font-family:var(--fm);font-size:11px">${bobot.toFixed(2)}%</td>
-    <td style="text-align:right;font-family:var(--fm);font-size:11px;color:var(--bl)">${noQty?'\u2014':qtyPlan+' '+sat}</td>
-    <td style="text-align:right;font-family:var(--fm);font-size:12px;font-weight:700;color:${todayQty>0?'var(--gn)':'var(--mt)'}">${todayQty>0?'+'+todayQty+' '+sat:'\u2014'}</td>
-    <td style="text-align:right;font-family:var(--fm);font-size:11px;color:var(--or)">${noQty?'\u2014':cumQty+' '+sat}</td>
-    <td style="text-align:right;font-family:var(--fm);font-size:11px;color:var(--or);font-weight:600">${pct.toFixed(1)}%</td>
-    <td style="text-align:right;font-family:var(--fm);font-size:11px;color:var(--gn)">${(kontrib*100).toFixed(2)}%</td>
-    <td style="text-align:center;font-size:10px;color:var(--mt)">${sat}</td>
-  </tr>`;
+  const noQty=!qtyPlan;
+  const hasToday=todayQty>0;
+  const pctColor=pct>=100?'var(--gn)':pct>=50?'var(--or)':'var(--rd)';
+  const rowBg=hasToday?'background:rgba(16,185,129,.05)':'';
+  const borderTop=isDeep?'border-top:1px solid rgba(30,45,69,.25)':'border-top:1px solid rgba(30,45,69,.3)';
+
+  // Progress mini-bar for % selesai column
+  const barW=pct.toFixed(0);
+  const pctCell=`<div style="display:flex;align-items:center;justify-content:flex-end;gap:5px">
+    <div style="width:36px;height:4px;background:var(--sf2);border-radius:2px;overflow:hidden;flex-shrink:0">
+      <div style="height:100%;width:${barW}%;background:${pctColor};border-radius:2px;transition:width .3s"></div>
+    </div>
+    <span style="font-family:var(--fm);font-size:11px;color:${pctColor};font-weight:600;min-width:36px;text-align:right">${pct.toFixed(1)}%</span>
+  </div>`;
+
+  return `<tr style="${rowBg};${borderTop};transition:background .1s"
+    onmouseover="this.style.background='rgba(59,130,246,.04)'"
+    onmouseout="this.style.background='${hasToday?'rgba(16,185,129,.05)':''}'">`
+    +`<td style="padding:7px 4px 7px ${indent}px;font-family:var(--fm);font-size:10px;color:var(--mt);white-space:nowrap">${num}</td>`
+    +`<td style="padding:7px 10px;font-family:var(--fb);font-size:11px;color:var(--tx)">${safeStr(node.name)}</td>`
+    +`<td style="padding:7px 14px 7px 0;text-align:right;font-family:var(--fm);font-size:10.5px;color:var(--mt)">${bobot.toFixed(2)}%</td>`
+    +`<td style="padding:7px 14px 7px 0;text-align:right;font-family:var(--fm);font-size:10.5px;color:var(--bl)">${noQty?'\u2014':`${qtyPlan}`}</td>`
+    +`<td style="padding:7px 14px 7px 0;text-align:right;font-family:var(--fm);font-size:11.5px;font-weight:700;color:${hasToday?'var(--gn)':'var(--mt)'}">${hasToday?`+${todayQty}`:'\u2014'}</td>`
+    +`<td style="padding:7px 14px 7px 0;text-align:right;font-family:var(--fm);font-size:10.5px;color:var(--or)">${noQty?'\u2014':`${cumQty}`}</td>`
+    +`<td style="padding:7px 14px 7px 0">${pctCell}</td>`
+    +`<td style="padding:7px 14px 7px 0;text-align:right;font-family:var(--fm);font-size:10.5px;color:var(--gn)">${(kontrib*100).toFixed(2)}%</td>`
+    +`<td style="padding:7px 8px;text-align:center;font-family:var(--fb);font-size:10px;color:var(--mt)">${sat?`<span style="background:var(--sf2);padding:1px 6px;border-radius:4px;border:1px solid var(--bd)">${sat}</span>`:'\u2014'}</td>`
+    +'</tr>';
 }
 function renderDrQtySetupForm(){
   const projId=$('drSetupProj')?.value;if(!projId){$('drQtySetupForm').innerHTML='';return;}
