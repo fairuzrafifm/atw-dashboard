@@ -520,7 +520,11 @@ function mapWbs(r) {
     parentId: r.parent_id, name: r.name, bobot: r.bobot,
     order: r.order, cumPlan: r.cum_plan, cumActual: r.cum_actual,
     startDate: r.start_date, finishDate: r.finish_date,
-    weeklyData: r.weekly_data || {}, weeklyPlan: r.weekly_plan || {}
+    weeklyData: r.weekly_data || {}, weeklyPlan: r.weekly_plan || {},
+    // Daily Report fields
+    qtyPlan:   r.qty_plan   != null ? +r.qty_plan : 0,
+    satuan:    r.satuan     || '',
+    dailyLogs: Array.isArray(r.daily_logs) ? r.daily_logs : (r.daily_logs ? JSON.parse(r.daily_logs) : [])
   };
 }
 function unmapWbs(w) {
@@ -531,7 +535,11 @@ function unmapWbs(w) {
     bobot: w.bobot || 0,
     order: w.order || 0, cum_plan: w.cumPlan || 0, cum_actual: w.cumActual || 0,
     start_date: w.startDate || null, finish_date: w.finishDate || null,
-    weekly_data: w.weeklyData || {}, weekly_plan: w.weeklyPlan || {}
+    weekly_data: w.weeklyData || {}, weekly_plan: w.weeklyPlan || {},
+    // Daily Report fields — simpan ke Supabase
+    qty_plan:   w.qtyPlan   != null ? +w.qtyPlan  : 0,
+    satuan:     w.satuan    || '',
+    daily_logs: w.dailyLogs || []
   };
 }
 
