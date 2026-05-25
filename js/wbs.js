@@ -281,8 +281,22 @@ function delWbs(id){
   const toRm=new Set([sid,...childIds,...grandIds]);
   const msg=`Hapus "${safeStr(node.name)}"${toRm.size>1?' dan '+(toRm.size-1)+' child-nya':''}?`;
   showConfirm(msg,()=>{
+    // 1. Tandai ke pending delete (agar Supabase/GSheet benar-benar hapus baris)
+    toRm.forEach(rmId=>{if(typeof addPendingDeleteWbs==='function')addPendingDeleteWbs(rmId);});
+    // 2. Simpan Set ID yg dihapus ke window agar _rtPoll tidak merge balik
+    if(!window._wbsRecentDeleted)window._wbsRecentDeleted=new Set();
+    toRm.forEach(rmId=>window._wbsRecentDeleted.add(String(rmId)));
+    // 3. Filter lokal & render segera
     WBS=WBS.filter(w=>!toRm.has(String(w.id)));
-    dirty();renderWBS();toast('Dihapus','warn');gsSync();
+    dirty();renderWBS();toast('Dihapus','warn');
+    gsSync();
+    // 4. Re-render ulang setelah 2 detik untuk override stale realtime/poll reload
+    setTimeout(()=>{
+      WBS=WBS.filter(w=>!window._wbsRecentDeleted||!window._wbsRecentDeleted.has(String(w.id)));
+      renderWBS();
+      // Bersihkan flag setelah 10 detik
+      setTimeout(()=>{if(window._wbsRecentDeleted)window._wbsRecentDeleted.clear();},10000);
+    },2000);
   });
 }
 // ── WBS PLAN ONLY ────────────────────────────────────────────
