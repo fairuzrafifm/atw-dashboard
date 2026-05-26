@@ -119,7 +119,6 @@ async function loadDocsFromSupabase() {
 }
 
 // ── PATCH render(), loadFromSupabase(), _syncAllProjSelectors() ──
-// Menggunakan polling agar aman terhadap urutan load script
 (function _patchGlobals() {
   var _renderPatched = false;
   var _loadPatched   = false;
@@ -131,7 +130,6 @@ async function loadDocsFromSupabase() {
       var _origRender = window.render;
       window.render = function() {
         _origRender.apply(this, arguments);
-        _syncDocProjDropdown();
         _updateDocKPI();
         var tp = document.getElementById('tp-documents');
         if (tp && tp.classList.contains('active')) renderDocs();
@@ -139,82 +137,109 @@ async function loadDocsFromSupabase() {
       _renderPatched = true;
     }
 
-    // Patch loadFromSupabase()
-    if (!_loadPatched && typeof window.loadFromSupabase === 'function') {
-      var _origLoad = window.loadFromSupabase;
-      window.loadFromSupabase = async function() {
-        await _origLoad.apply(this, arguments);
-        await loadDocsFromSupabase();
-      };
-      _loadPatched = true;
-    }
+    // loadFromSupabase sudah diupdate langsung di supabase.js
+    // (documents table masuk Promise.all) — tidak perlu patch lagi
+    _loadPatched = true;
 
-    // Patch _syncAllProjSelectors() — supaya docFiltProj ikut ter-sync saat klik sidebar
+    // Patch _syncAllProjSelectors() — pola SAMA PERSIS dengan Procurement
     if (!_syncPatched && typeof window._syncAllProjSelectors === 'function') {
       var _origSync = window._syncAllProjSelectors;
       window._syncAllProjSelectors = function(id) {
         _origSync.apply(this, arguments);
-        _syncDocProjDropdown(String(id));
+        var sid = String(id);
+        var docEl = document.getElementById('docFiltProj');
+        if (docEl) {
+          // Simpan nilai sebelum rebuild (sama seperti rebuildOpts di core.js)
+          var savedVal = docEl.value;
+          docEl.innerHTML = '<option value="">Semua Project</option>' +
+            (typeof P !== 'undefined' ? P : []).map(function(p) {
+              return '<option value="' + p.id + '">' + p.kode + ' — ' + p.nama + '</option>';
+            }).join('');
+          // POLA COST/FINANCE: sidebar selalu override, reset manual flag
+          docEl._docFiltManual = false;
+          docEl.value = sid;
+          if (typeof activeTab !== 'undefined' && activeTab === 'documents') renderDocs();
+        }
+        // Sync modal project dropdown
+        var mSel = document.getElementById('docModalProj');
+        if (mSel) {
+          var curVal = mSel.value;
+          mSel.innerHTML = (typeof P !== 'undefined' ? P : []).map(function(p) {
+            return '<option value="' + p.id + '">' + p.kode + ' — ' + p.nama + '</option>';
+          }).join('');
+          mSel.value = curVal || sid;
+        }
       };
       _syncPatched = true;
     }
 
-    if (!_renderPatched || !_loadPatched || !_syncPatched) setTimeout(_tryPatch, 150);
+    if (!_renderPatched || !_syncPatched) setTimeout(_tryPatch, 150);
   }
-
   setTimeout(_tryPatch, 0);
 })();
 
-// ── SYNC PROJECT DROPDOWN (filter bar) ───────────────────────────
-// id opsional: jika diisi, set value ke id tsb; jika kosong, hanya rebuild opsi
-function _syncDocProjDropdown(id) {
-  var sel = document.getElementById('docFiltProj');
-  if (!sel) return;
-
+// ── INITIAL POPULATE (saat tab Dokumen pertama dibuka) ────────────
+function _syncDocProjDropdown() {
+  var docEl = document.getElementById('docFiltProj');
+  if (!docEl) return;
   var projects = typeof P !== 'undefined' ? P : [];
+  if (!projects.length) { setTimeout(_syncDocProjDropdown, 300); return; }
 
-  // Jika P[] belum terisi, retry setelah 300ms
-  if (!projects.length) {
-    setTimeout(function() { _syncDocProjDropdown(id); }, 300);
-    return;
-  }
-
-  // Rebuild options (selalu fresh agar list up-to-date)
-  sel.innerHTML = '<option value="">Semua Project</option>' +
+  var isManual = !!docEl._docFiltManual;
+  var savedVal = docEl.value;
+  docEl.innerHTML = '<option value="">Semua Project</option>' +
     projects.map(function(p) {
-      return '<option value="' + p.id + '">' +
-        (p.kode ? p.kode + ' \u2014 ' : '') + (p.nama || '') +
-        '</option>';
+      return '<option value="' + p.id + '">' + p.kode + ' — ' + p.nama + '</option>';
     }).join('');
-
-  // Hanya auto-sync ke sidebar jika user BELUM set filter manual
-  if (!sel._docFiltManual) {
-    var activeId = id || (typeof selId !== 'undefined' && selId ? String(selId) : '');
-    if (activeId) sel.value = activeId;
+  if (isManual) {
+    docEl.value = savedVal; // pertahankan pilihan user — termasuk '' (Semua Project)
+  } else {
+    var sid = typeof selId !== 'undefined' && selId ? String(selId) : '';
+    if (sid) docEl.value = sid;
   }
 
-  // Juga sync modal project dropdown
+  // Modal project
   var mSel = document.getElementById('docModalProj');
   if (mSel) {
     var curVal = mSel.value;
     mSel.innerHTML = projects.map(function(p) {
-      return '<option value="' + p.id + '">' +
-        (p.kode ? p.kode + ' \u2014 ' : '') + (p.nama || '') +
-        '</option>';
+      return '<option value="' + p.id + '">' + p.kode + ' — ' + p.nama + '</option>';
     }).join('');
-    mSel.value = curVal || activeId || (projects[0] ? String(projects[0].id) : '');
+    mSel.value = curVal || (typeof selId !== 'undefined' ? String(selId) : '');
   }
 }
+
+// ── SYNC KATEGORI FILTER DROPDOWN ────────────────────────────────
+// Rebuild otomatis dari data DOCS yang sudah ada
+function _syncDocKatFilter() {
+  var sel = document.getElementById('docFiltKat');
+  if (!sel) return;
+  var docs = typeof DOCS !== 'undefined' ? DOCS : [];
+  var existing = sel.value; // simpan pilihan aktif
+
+  // Kumpulkan kategori unik dari data
+  var cats = [];
+  docs.forEach(function(d) {
+    if (d.kategori && cats.indexOf(d.kategori) === -1) cats.push(d.kategori);
+  });
+  cats.sort();
+
+  // Rebuild options
+  sel.innerHTML = '<option value="">Semua Kategori</option>' +
+    cats.map(function(c) {
+      return '<option value="' + c + '"' + (c === existing ? ' selected' : '') + '>' + c + '</option>';
+    }).join('');
+}
+
 
 // ── UPDATE KPI PORTFOLIO OVERVIEW ───────────────────────────────
 function _updateDocKPI() {
   var ovDoc  = document.getElementById('ovDoc');
   var ovDocS = document.getElementById('ovDocS');
   if (!ovDoc) return;
-  var docs = typeof DOCS !== 'undefined' ? DOCS : [];
+  var docs  = typeof DOCS !== 'undefined' ? DOCS : [];
   var total = docs.length;
 
-  // Pakai _countUp agar skel class otomatis terhapus
   if (typeof _countUp === 'function') {
     ovDoc.style.color = 'var(--pu)';
     _countUp(ovDoc, total, '', 600);
@@ -225,50 +250,18 @@ function _updateDocKPI() {
   }
 
   if (ovDocS) {
-    // Hitung semua status dari _DOC_STATUS_CFG
     var parts = _DOC_STATUS_KEYS.map(function(s) {
       var cnt = docs.filter(function(d) { return d.status === s; }).length;
       if (!cnt) return null;
       var cfg = _DOC_STATUS_CFG[s];
-      // Singkat label agar muat di KPI kecil
       var lbl = s === 'Approved with Note' ? 'ApvNote'
                : s === 'Submitted'         ? 'Sub'
                : s === 'On Review'         ? 'Review'
                : s;
       return '<span style="color:' + cfg.c + '">' + lbl + ': ' + cnt + '</span>';
     }).filter(Boolean);
-
-    // Juga tangkap status tidak dikenal (custom)
-    docs.forEach(function(d) {
-      if (d.status && !_DOC_STATUS_CFG[d.status]) {
-        var found = parts.some(function(p) { return p.indexOf(d.status) !== -1; });
-        if (!found) parts.push('<span style="color:var(--mt)">' + d.status + ': 1</span>');
-      }
-    });
-
     ovDocS.innerHTML = parts.join(' <span style="color:var(--bd)">·</span> ') || '<span style="color:var(--mt)">Belum ada data</span>';
   }
-}
-
-// ── STATUS BADGE ─────────────────────────────────────────────────
-function _docBadge(status) {
-  var cfg = _DOC_STATUS_CFG[status] || { c:'var(--mt)', bg:'rgba(100,116,139,.1)', bd:'rgba(100,116,139,.25)' };
-  return '<span style="display:inline-block;padding:2px 10px;border-radius:20px;font-size:9px;font-weight:700;letter-spacing:.3px;background:' +
-    cfg.bg + ';color:' + cfg.c + ';border:1px solid ' + cfg.bd + '">' + (status || '—') + '</span>';
-}
-
-// ── PROJECT NAME LOOKUP ───────────────────────────────────────────
-function _docProjName(projId) {
-  var projects = typeof P !== 'undefined' ? P : [];
-  var p = projects.find(function(x) { return String(x.id) === String(projId); });
-  return p ? (p.kode || p.nama || String(projId)) : String(projId || '—');
-}
-
-// ── FORMAT DATE ───────────────────────────────────────────────────
-function _fmtDocDate(d) {
-  if (!d) return '—';
-  try { return new Date(d + 'T00:00:00').toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' }); }
-  catch(e) { return d; }
 }
 
 // ── KATEGORI COLOR MAP ────────────────────────────────────────────
@@ -293,26 +286,26 @@ function _katColor(kat) {
   return _katColorMap[kat];
 }
 
-// ── SYNC KATEGORI FILTER DROPDOWN ────────────────────────────────
-// Rebuild otomatis dari data DOCS yang sudah ada
-function _syncDocKatFilter() {
-  var sel = document.getElementById('docFiltKat');
-  if (!sel) return;
-  var docs = typeof DOCS !== 'undefined' ? DOCS : [];
-  var existing = sel.value; // simpan pilihan aktif
+// ── STATUS BADGE ─────────────────────────────────────────────────
+function _docBadge(status) {
+  var cfg = _DOC_STATUS_CFG[status] || { c:'var(--mt)', bg:'rgba(100,116,139,.08)', bd:'rgba(100,116,139,.2)' };
+  return '<span style="background:' + cfg.bg + ';color:' + cfg.c + ';border:1px solid ' + cfg.bd + ';border-radius:5px;padding:2px 9px;font-size:9px;font-weight:700;letter-spacing:.3px;white-space:nowrap">' + safeStr(status || '—') + '</span>';
+}
 
-  // Kumpulkan kategori unik dari data
-  var cats = [];
-  docs.forEach(function(d) {
-    if (d.kategori && cats.indexOf(d.kategori) === -1) cats.push(d.kategori);
-  });
-  cats.sort();
+// ── FORMAT DATE ───────────────────────────────────────────────────
+function _fmtDocDate(d) {
+  if (!d) return '—';
+  try {
+    var dt = new Date(d);
+    return dt.toLocaleDateString('id-ID', { day:'2-digit', month:'short', year:'numeric' });
+  } catch(e) { return String(d); }
+}
 
-  // Rebuild options
-  sel.innerHTML = '<option value="">Semua Kategori</option>' +
-    cats.map(function(c) {
-      return '<option value="' + c + '"' + (c === existing ? ' selected' : '') + '>' + c + '</option>';
-    }).join('');
+// ── GET PROJECT NAME BY ID ────────────────────────────────────────
+function _docProjName(projId) {
+  var projects = typeof P !== 'undefined' ? P : [];
+  var p = projects.find(function(x) { return String(x.id) === String(projId); });
+  return p ? (p.kode || p.nama || String(projId)) : String(projId || '—');
 }
 
 // ================================================================
@@ -660,3 +653,30 @@ function exportDocsPDF() {
     try { w.focus(); w.print(); } catch(e) {}
   }, 500);
 }
+
+// ── AUTO-LOAD: Panggil loadDocsFromSupabase() saat halaman siap ──
+// documents.js load sebelum core.js, sehingga patch loadFromSupabase
+// bisa terlambat. Direct call ini memastikan DOCS[] terisi.
+(function _autoLoadDocs() {
+  function _tryLoad() {
+    // Tunggu sampai _initSb() tersedia (supabase.js sudah load)
+    if (typeof _initSb !== 'function') {
+      setTimeout(_tryLoad, 200);
+      return;
+    }
+    // Tunggu sampai auth selesai (user sudah login)
+    var client = _initSb();
+    if (!client) {
+      setTimeout(_tryLoad, 200);
+      return;
+    }
+    // Load data dokumen
+    loadDocsFromSupabase().then(function() {
+      _updateDocKPI();
+      var tp = document.getElementById('tp-documents');
+      if (tp && tp.classList.contains('active')) renderDocs();
+    });
+  }
+  // Tunggu sebentar agar supabase.js dan auth.js selesai inisialisasi
+  setTimeout(_tryLoad, 800);
+})();
