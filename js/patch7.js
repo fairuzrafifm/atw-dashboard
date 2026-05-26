@@ -1,5 +1,31 @@
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  ⚠  PATCH TERAKHIR — TIDAK ADA PATCH8 DST                  ║
+// ║                                                              ║
+// ║  Semua perbaikan selanjutnya HARUS dilakukan langsung di    ║
+// ║  file sumber:                                                ║
+// ║    • core.js        • projects.js   • wbs.js                ║
+// ║    • reports.js     • scurve.js     • documents.js          ║
+// ║    • cost-rab.js    • manpower.js   • daily.js              ║
+// ║    • gantt.js       • auth.js       • utils.js              ║
+// ║                                                              ║
+// ║  Status patch yang ada (patch1–patch7):                     ║
+// ║    patch1 — User registration, edit lock system             ║
+// ║    patch2 — Migrasi GSheet → Supabase, retry queue          ║
+// ║    patch3 — Realtime history, lock WBS/Daily, auto-refresh  ║
+// ║    patch4 — Lazy loading project-scoped (Phase 1 & 2)       ║
+// ║    patch5 — Procurement KPI, status workflow, showConfirm   ║
+// ║    patch6 — Clone Dokumen bulk                              ║
+// ║    patch7 — S-Curve redesign (Chart.js), WBS table fix      ║
+// ║                                                              ║
+// ║  Fix yang sudah ada di source (TIDAK perlu di-patch lagi):  ║
+// ║    • showConfirm z-index        → core.js (patch5 wins)     ║
+// ║    • KPI Overdue/Due Today      → projects.js (patch5 wins) ║
+// ║    • WBS nama tidak terpotong   → wbs.js ✓                  ║
+// ║    • Weekly Report SVG font     → reports.js ✓              ║
+// ╚══════════════════════════════════════════════════════════════╝
+
 // ============================================================
-// ATW Dashboard — patch7.js  (v3)
+// ATW Dashboard — patch7.js  (v3) — PATCH TERAKHIR
 // UI Polish:
 //   1. WBS — kolom sejajar (table-layout:fixed) + nama tidak terpotong
 //   2. S-Curve dashboard — desain lebih bersih
@@ -114,11 +140,12 @@
           data:{labels:labels,datasets:[
             {type:'bar',label:'W.Plan',data:wPlanData,backgroundColor:BLLT+'80',borderColor:BLLT,borderWidth:1,borderRadius:2,borderSkipped:'bottom',yAxisID:'yBar',order:4},
             {type:'bar',label:'W.Actual',data:wActData,backgroundColor:OR+'99',borderColor:OR,borderWidth:1,borderRadius:2,borderSkipped:'bottom',yAxisID:'yBar',order:3},
-            {type:'line',label:'Cum. Plan',data:cPlanData,borderColor:BL,backgroundColor:grad,borderWidth:2.5,pointBackgroundColor:BL,pointRadius:3,pointHoverRadius:5,fill:true,tension:0.4,yAxisID:'yCum',order:2},
-            {type:'line',label:'Cum. Actual',data:cActData,borderColor:OR,backgroundColor:'transparent',borderWidth:2.5,borderDash:[7,4],pointBackgroundColor:OR,pointRadius:3.5,pointHoverRadius:6,fill:false,tension:0.4,spanGaps:false,yAxisID:'yCum',order:1},
+            {type:'line',label:'Cum. Plan',data:cPlanData,borderColor:BL,backgroundColor:grad,borderWidth:2.5,pointBackgroundColor:BL,pointRadius:3,pointHoverRadius:5,fill:true,tension:0.4,yAxisID:'yCum',order:2,clip:false},
+            {type:'line',label:'Cum. Actual',data:cActData,borderColor:OR,backgroundColor:'transparent',borderWidth:2.5,borderDash:[7,4],pointBackgroundColor:OR,pointRadius:3.5,pointHoverRadius:6,fill:false,tension:0.4,spanGaps:false,yAxisID:'yCum',order:1,clip:false},
           ]},
           options:{
             responsive:true,maintainAspectRatio:false,
+            layout:{padding:{top:12,right:8}},
             interaction:{mode:'index',intersect:false},
             plugins:{
               legend:{display:false},

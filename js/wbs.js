@@ -125,7 +125,7 @@ function renderWBS(){
   }
   else{
     const fmtD=d=>d?new Date(d+'T12:00').toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'2-digit'}):'\u2014';
-    html=`<table class="tbl"><thead><tr><th style="width:50px">#</th><th>Item Pekerjaan</th><th style="width:70px;text-align:right">Bobot</th><th style="width:88px">Start</th><th style="width:88px">Finish</th><th style="width:80px;text-align:right">% Selesai</th><th style="width:80px;text-align:right">Kontribusi</th><th style="width:75px;text-align:center">Aksi</th></tr></thead><tbody>`;
+    html=`<table class="tbl" style="table-layout:fixed;width:100%"><thead><tr><th style="width:50px">#</th><th style="min-width:260px">Item Pekerjaan</th><th style="width:70px;text-align:right">Bobot</th><th style="width:88px">Start</th><th style="width:88px">Finish</th><th style="width:80px;text-align:right">% Selesai</th><th style="width:80px;text-align:right">Kontribusi</th><th style="width:75px;text-align:center">Aksi</th></tr></thead><tbody>`;
     cats.forEach((cat,ci)=>{
       const db=cat._ab||+cat.bobot||0;
       // Auto-summarize dates from all children
@@ -148,9 +148,9 @@ function renderWBS(){
         const barColor=subPct>=100?'var(--gn)':subPct>0?'var(--or)':'var(--bd)';
         html+=`<tr style="background:rgba(16,185,129,.05)">
           <td style="padding-left:16px;font-family:var(--fm);color:var(--gn);font-weight:600">${ci+1}.${si+1}</td>
-          <td style="padding-left:22px;color:var(--gn);font-size:12px;font-weight:600">
+          <td style="padding-left:22px;color:var(--gn);font-size:12px;font-weight:600;overflow:hidden">
             <span class="wbs-inline-text edit-only" onclick="this.classList.add('editing');this.querySelector('input').focus()" title="Klik untuk edit nama">
-              <input value="${safeStr(sub.name)}" onblur="saveWbsInlineText('${sub.id}','name',this.value);this.closest('.wbs-inline-text')?.classList.remove('editing')" onkeydown="if(event.key==='Enter'){this.blur()}" style="color:var(--gn);font-weight:600;font-size:12px;min-width:80px">
+              <input value="${safeStr(sub.name)}" onblur="saveWbsInlineText('${sub.id}','name',this.value);this.closest('.wbs-inline-text')?.classList.remove('editing')" onkeydown="if(event.key==='Enter'){this.blur()}" style="color:var(--gn);font-weight:600;font-size:12px;min-width:80px;width:100%;max-width:none">
             </span>${bobotMismatch?'<span style="font-size:9px;color:var(--yw);margin-left:6px">⚠</span>':''}
             ${!isLeaf&&subPct>0?`<div style="margin-top:4px;height:4px;background:var(--bd);border-radius:3px;overflow:hidden;max-width:200px"><div style="width:${Math.min(100,subPct)}%;height:100%;background:linear-gradient(90deg,${barColor},${barColor==='var(--or)'?'#fbbf24':'#34d399'});transition:width .4s"></div></div>`:''}
           </td>
@@ -167,9 +167,9 @@ function renderWBS(){
           const b=+item.bobot||0;const pct=+item.cumActual||0;
           html+=`<tr>
             <td style="padding-left:30px;font-size:10px;color:var(--mt)">${ci+1}.${si+1}.${ii+1}</td>
-            <td style="padding-left:38px;font-size:11px;color:var(--tx)">
+            <td style="padding-left:38px;font-size:11px;color:var(--tx);overflow:hidden">
               <span class="wbs-inline-text edit-only" onclick="this.classList.add('editing');this.querySelector('input').focus()" title="Klik untuk edit nama">
-                <input value="${safeStr(item.name)}" onblur="saveWbsInlineText('${item.id}','name',this.value);this.closest('.wbs-inline-text')?.classList.remove('editing')" onkeydown="if(event.key==='Enter'){this.blur()}" style="color:var(--tx);font-size:11px;min-width:80px">
+                <input value="${safeStr(item.name)}" onblur="saveWbsInlineText('${item.id}','name',this.value);this.closest('.wbs-inline-text')?.classList.remove('editing')" onkeydown="if(event.key==='Enter'){this.blur()}" style="color:var(--tx);font-size:11px;min-width:80px;width:100%;max-width:none">
               </span>
             </td>
             <td style="text-align:right;font-family:var(--fm);font-size:11px">

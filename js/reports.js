@@ -500,6 +500,11 @@ function generateWeeklyReport(){
         tbody{display:table-row-group}
         tr{break-inside:avoid}
       }
+      svg{width:100%!important;height:auto!important}
+      svg text{font-size:9px!important;font-family:Arial,sans-serif}
+      svg text[font-weight='bold']{font-size:10px!important}
+      svg text[text-anchor='middle']{font-size:8px!important}
+      svg text[text-anchor='end']{font-size:8px!important}
     </style>
   </head><body>
   <table class="pdf-wrap"><thead><tr><td>
@@ -851,14 +856,14 @@ function buildWeeklyReportHTML(projId,week){
     })()}
   </table>
 
-  ${'<'}!-- S-Curve Line Chart -->
-  <div style="margin-bottom:16px;padding:14px;background:#fff;border:1px solid #e2e8f0;border-radius:6px">
-    <div style="font-size:9px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">S-CURVE PROGRESS CHART</div>
+  <!-- S-Curve Line Chart -->
+  <div style="margin-bottom:16px;padding:10px 0;background:#fff;border:1px solid #e2e8f0;border-radius:6px">
+    <div style="font-size:9px;font-weight:700;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:1px;padding:0 14px">S-CURVE PROGRESS CHART</div>
     ${(()=>{
       const scData=SCURVE.filter(d=>String(d.projId)===String(projId)).sort((a,b)=>a.week-b.week);
       if(!scData.length)return'<div style="text-align:center;color:#94a3b8;font-size:10px;padding:30px">Belum ada data S-Curve</div>';
 
-      const W=560, H=200;
+      const W=780, H=220;
       const padL=36, padR=20, padT=20, padB=30;
       const chartW=W-padL-padR, chartH=H-padT-padB;
       const n=scData.length;
@@ -933,6 +938,7 @@ function buildWeeklyReportHTML(projId,week){
       });
 
       return`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;overflow:visible">
+        <style>text{font-family:Arial,sans-serif;font-size:9px}text[font-weight="bold"]{font-size:10px}text[text-anchor="middle"]{font-size:8px}text[text-anchor="end"]{font-size:8px}</style>
         ${'<'}!-- Grid -->
         ${gridY}${gridX}
         ${'<'}!-- Axes -->
