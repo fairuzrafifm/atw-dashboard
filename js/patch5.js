@@ -246,13 +246,90 @@
     statuses: STATUSES,
   };
 
+  // ═══════════════════════════════════════════════════════════
+  // OVERRIDE 5 — showConfirm
+  // Root cause: .ov (modal) z-index:9999, confirmBox z-index:9998
+  // → dialog selalu tertutup di belakang modal.
+  // Fix: z-index 99999 + backdrop gelap + posisi tengah layar.
+  // ═══════════════════════════════════════════════════════════
+  window.showConfirm = function (msg, onYes) {
+    // Hapus instance lama
+    var old = document.getElementById('confirmBox');
+    if (old) old.remove();
+    var oldBg = document.getElementById('confirmBackdrop');
+    if (oldBg) oldBg.remove();
+
+    // Backdrop gelap (di atas modal tapi di bawah dialog)
+    var bg = document.createElement('div');
+    bg.id = 'confirmBackdrop';
+    bg.style.cssText = [
+      'position:fixed;inset:0;',
+      'background:rgba(0,0,0,.55);',
+      'z-index:99998;',           // tepat di bawah dialog
+      'animation:su .15s ease',
+    ].join('');
+    document.body.appendChild(bg);
+
+    // Dialog confirm
+    var box = document.createElement('div');
+    box.id = 'confirmBox';
+    box.style.cssText = [
+      'position:fixed;',
+      'top:50%;left:50%;',
+      'transform:translate(-50%,-50%);',
+      'z-index:99999;',           // di atas segalanya termasuk .ov (9999)
+      'background:var(--sf);',
+      'border:1px solid var(--bd);',
+      'border-top:3px solid var(--rd);',
+      'border-radius:10px;',
+      'padding:20px 22px;',
+      'box-shadow:0 16px 48px rgba(0,0,0,.6);',
+      'max-width:380px;width:90vw;',
+      'animation:su .18s ease',
+    ].join('');
+
+    box.innerHTML = [
+      '<div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px">',
+        '<div style="width:32px;height:32px;border-radius:50%;background:rgba(239,68,68,.15);',
+             'display:flex;align-items:center;justify-content:center;flex-shrink:0">',
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rd)" stroke-width="2.5">',
+            '<polyline points="3 6 5 6 21 6"/>',
+            '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+          '</svg>',
+        '</div>',
+        '<div style="font-size:13px;color:var(--tx);line-height:1.5;padding-top:4px">' + msg + '</div>',
+      '</div>',
+      '<div style="display:flex;gap:8px;justify-content:flex-end">',
+        '<button id="confirmNo"  class="btn" style="padding:6px 18px;min-width:70px">Batal</button>',
+        '<button id="confirmYes" class="btn" style="padding:6px 18px;min-width:70px;',
+          'background:var(--rd);color:#fff;border-color:var(--rd)">Hapus</button>',
+      '</div>',
+    ].join('');
+
+    document.body.appendChild(box);
+
+    function _close() {
+      box.remove();
+      bg.remove();
+    }
+
+    document.getElementById('confirmNo').onclick  = _close;
+    document.getElementById('confirmYes').onclick = function () { _close(); onYes(); };
+    bg.onclick = _close;  // klik di luar = batal
+
+    // Auto-dismiss setelah 10 detik
+    setTimeout(function () { if (document.getElementById('confirmBox')) _close(); }, 10000);
+  };
+
+  _log('showConfirm override aktif ✓ (z-index:99999, centered, backdrop)');
+
   _log([
     'Patch 5 loaded ✓',
     '  • KPI Overdue & Due Today → otomatis dari field due',
     '  • KPI Waiting → Waiting Approval saja',
     '  • Status: ' + STATUSES.join(' → '),
     '  • On Production → tampilkan kolom harga',
-    '  • 4 override: renderProc, toggleProcCost, openModal, loadProjectData',
+    '  • showConfirm → selalu di atas modal (z-index:99999)',
   ].join('\n'));
 
 })();
