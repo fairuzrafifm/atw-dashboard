@@ -94,6 +94,7 @@ async function loadFromSupabase() {
       { data: rab },
       { data: wbs },
       { data: scurve },
+      { data: documents },
     ] = await Promise.all([
       (_initSb()).from('projects').select('*').order('created_at'),
       (_initSb()).from('project_history').select('*').order('date'),
@@ -105,6 +106,7 @@ async function loadFromSupabase() {
       (_initSb()).from('rab').select('*').order('urutan'),
       (_initSb()).from('wbs').select('*').order('order'),
       (_initSb()).from('scurve').select('*').order('week'),
+      (_initSb()).from('documents').select('*').order('created_at', { ascending: false }),
     ]);
 
     // Map dari snake_case Supabase → camelCase dashboard
@@ -117,6 +119,9 @@ async function loadFromSupabase() {
     RAB     = (rab || []).map(mapRab);
     WBS     = (wbs || []).map(mapWbs);
     SCURVE  = (scurve || []).map(mapScurve);
+    if (typeof mapDocument === 'function') {
+      DOCS = (documents || []).map(mapDocument);
+    }
 
     // Merge history ke masing-masing project
     (history || []).forEach(h => {
