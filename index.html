@@ -37,23 +37,42 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" onerror="this.remove()">
 <style>
 :root{
-  --bg:#0a0e1a;--sf:#111827;--sf2:#1a2235;--bd:#1e2d45;
-  --or:#f97316;--bl:#3b82f6;--gn:#10b981;--yw:#f59e0b;
-  --rd:#ef4444;--pu:#8b5cf6;--tx:#e2e8f0;--mt:#64748b;
-  --ib:#1e293b;--ibr:#3b4f6b;
-  --atb:#2d7ab5;--att:#1d6c7a;
+  /* ── INDUSTRIAL EXECUTIVE DASHBOARD — ATW Solar ── */
+  --bg:#0c1621;       /* Deep navy — ruang gelap profesional */
+  --sf:#122030;       /* Card surface navy */
+  --sf2:#1a2e42;      /* Elevated surface */
+  --bd:#1f3550;       /* Border subtle */
+  --or:#f59b30;       /* Orange accent — warm, authority */
+  --bl:#3d8fd4;       /* Blue — data/info */
+  --gn:#1db87a;       /* Green — on track */
+  --yw:#e8a020;       /* Amber — warning */
+  --rd:#e04545;       /* Red — critical */
+  --pu:#8b72d4;       /* Purple — secondary */
+  --tx:#dce8f4;       /* Text — cool white */
+  --mt:#5a7a94;       /* Muted — steel gray */
+  --ib:#162840;       /* Input bg */
+  --ibr:#244060;      /* Input border focus */
+  --atb:#2a6fa8;--att:#1a6a60;
   --fd:'Bebas Neue',sans-serif;--fb:'DM Sans',sans-serif;--fm:'JetBrains Mono',monospace;
+  /* Executive grid lines */
+  --rule:rgba(31,53,80,.8);
 }
 /* LIGHT THEME */
 :root.light{
-  --bg:#f0f4f8;--sf:#ffffff;--sf2:#e8eef5;--bd:#d0dbe8;
-  --or:#ea6c10;--bl:#1d6eb5;--gn:#0a9268;--yw:#c47d0a;
-  --rd:#dc2626;--pu:#7c3aed;--tx:#0f172a;--mt:#64748b;
-  --ib:#f1f5f9;--ibr:#cbd5e1;
-  --atb:#1d6eb5;--att:#0f6e56;
+  --bg:#eef3f9;       /* Warm gray-blue page */
+  --sf:#ffffff;       /* Pure white cards */
+  --sf2:#e4ecf5;      /* Light surface */
+  --bd:#c4d4e4;       /* Steel border */
+  --or:#e07010;       /* Orange deeper on light */
+  --bl:#1a68b0;--gn:#0a8c68;--yw:#b87200;
+  --rd:#cc2020;--pu:#6a34c8;
+  --tx:#0a1828;       /* Deep navy text */
+  --mt:#4a6880;       /* Steel muted */
+  --ib:#f4f7fb;--ibr:#a8c0d8;
+  --atb:#1a68b0;--att:#0a6454;
 }
 :root.light body{background:var(--bg)}
-:root.light .hdr{background:linear-gradient(135deg,#0f2444 0%,#1a3a6b 100%)}
+:root.light .hdr{background:linear-gradient(180deg,#0c1e30 0%,#0f2540 100%)}
 :root.light .hdr::after{opacity:.5}
 /* Header text harus tetap terang karena background header selalu gelap */
 :root.light .dash-ttl{color:#e2e8f0}
@@ -76,10 +95,14 @@
 :root.light .hdr-right .gs-badge.gs-off{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25);color:#94a3b8}
 :root.light #roleBadgeHdr{color:#e2e8f0!important;border-color:rgba(255,255,255,.2)!important}
 :root.light .tabs{background:#ffffff;border-bottom-color:var(--bd)}
-:root.light .sidebar{background:#ffffff;border-right-color:var(--bd)}
-:root.light .pi:hover{background:#f1f5f9}
-:root.light .pi.active{background:rgba(234,108,16,.08)}
-:root.light .card{background:#ffffff;border-color:var(--bd)}
+:root.light .sidebar{background:linear-gradient(180deg,#0f2238 0%,#122840 100%);border-right-color:var(--bd)}
+:root.light .pi:hover{background:rgba(255,255,255,.06)}
+:root.light .pi.active{background:rgba(245,155,48,.1);border-left-color:var(--or)}
+:root.light .pi-name{color:#dce8f4}
+:root.light .pi-loc{color:#6b8cad}
+:root.light .pi-meta{color:#7aa0c0}
+:root.light .sb-title{color:#5a7a94}
+:root.light .card{background:#ffffff;border-color:var(--bd);box-shadow:0 1px 4px rgba(10,25,50,.08)}
 :root.light .kpi{background:#ffffff;border-color:var(--bd)}
 :root.light .metric{background:#f8fafc;border-color:var(--bd)}
 :root.light .modal{background:#ffffff;border-color:var(--bd)}
@@ -211,8 +234,8 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
 
 /* HEADER */
-.hdr{background:linear-gradient(135deg,#0a0f1e 0%,#0c1420 100%);border-bottom:2px solid var(--atb);padding:0 12px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0;position:relative;z-index:50;gap:6px}
-.hdr::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,var(--or) 50%,transparent 100%);opacity:.35}
+.hdr{background:linear-gradient(180deg,#0a1928 0%,#0d1f30 100%);border-bottom:2px solid var(--or);padding:0 12px;display:flex;align-items:center;justify-content:space-between;height:52px;flex-shrink:0;position:relative;z-index:50;gap:6px;box-shadow:0 2px 20px rgba(0,0,0,.4)}
+.hdr::after{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.06) 50%,transparent 100%)}
 .logo-wrap{display:flex;align-items:center;gap:8px;flex-shrink:0;min-width:0;overflow:hidden}
 .logo-img{height:30px;width:auto;object-fit:contain;filter:brightness(1.1) drop-shadow(0 0 6px rgba(255,255,255,.15));}
 .logo-edit-wrap:hover #logoEditOverlay{opacity:1!important}
@@ -235,8 +258,8 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 @media(max-width:680px){#liveDate{display:none}}
 
 /* SAVE BAR */
-.sbar{background:#0b1710;border-bottom:1px solid #1a3820;padding:3px 12px;display:flex;align-items:center;justify-content:space-between;font-size:11px;flex-shrink:0;min-height:28px;gap:6px}
-.sbar.dirty{background:#18120a;border-bottom-color:#3d2d00}
+.sbar{background:#0d1e2e;border-bottom:1px solid var(--bd);padding:3px 12px;display:flex;align-items:center;justify-content:space-between;font-size:11px;flex-shrink:0;min-height:26px;gap:6px}
+.sbar.dirty{background:#1e1408;border-bottom-color:rgba(245,155,48,.3)}
 .sbar-info{display:flex;align-items:center;gap:6px;color:var(--mt);min-width:0;overflow:hidden;flex-shrink:1}
 .sbar-info #smsg{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sbar-btns{display:flex;gap:5px;flex-shrink:0;align-items:center}
@@ -251,8 +274,8 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* BUTTONS */
-.btn{background:var(--sf2);border:1px solid var(--bd);color:var(--tx);padding:5px 12px;border-radius:6px;cursor:pointer;font-family:var(--fb);font-size:12px;transition:background .1s;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
-.btn:hover{border-color:var(--or);color:var(--or)}
+.btn{background:transparent;border:1px solid var(--bd);color:var(--mt);padding:5px 12px;border-radius:4px;cursor:pointer;font-family:var(--fb);font-size:11px;font-weight:600;letter-spacing:.2px;transition:all .15s;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.btn:hover{border-color:var(--or);color:var(--or);background:rgba(245,155,48,.06)}
 .btn:active{transform:scale(.97)}
 .btn-sm{padding:3px 9px;font-size:11px}
 .bp{background:var(--or);border-color:var(--or);color:#fff;font-weight:600}.bp:hover{background:#ea6c10;color:#fff;border-color:#ea6c10}
@@ -262,10 +285,10 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 .brd{background:rgba(239,68,68,.1);border-color:var(--rd);color:var(--rd)}.brd:hover{background:var(--rd);color:#fff}
 
 /* TABS */
-.tabs{display:flex;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0;overflow-x:auto}
-.tab{padding:8px 15px;cursor:pointer;font-size:12px;font-weight:500;color:var(--mt);border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0;user-select:none}
-.tab:hover{color:var(--tx)}
-.tab.active{color:var(--or);border-bottom-color:var(--or)}
+.tabs{display:flex;background:var(--sf);border-bottom:1px solid var(--bd);flex-shrink:0;overflow-x:auto;gap:0}
+.tab{padding:9px 16px;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.3px;color:var(--mt);border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0;user-select:none;text-transform:uppercase;transition:color .15s,border-color .15s}
+.tab:hover{color:var(--tx);background:rgba(255,255,255,.02)}
+.tab.active{color:var(--or);border-bottom-color:var(--or);background:rgba(245,155,48,.04)}
 
 /* LAYOUT */
 .layout{display:grid;grid-template-columns:252px 1fr;flex:1;overflow:hidden;transition:grid-template-columns .25s ease}
@@ -280,13 +303,13 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 .sb-arrow{transition:transform .2s;display:block}
 
 /* SIDEBAR */
-.sidebar{background:var(--sf);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.sidebar{background:linear-gradient(180deg,#0e1f30 0%,#0c1a28 100%);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
 .sb-head{padding:10px 12px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
 .sb-title{font-family:var(--fd);font-size:12px;letter-spacing:2px;color:var(--mt)}
 .proj-list{flex:1;overflow-y:auto;padding:6px}
-.pi{padding:9px 10px;border-radius:8px;border:1px solid transparent;cursor:pointer;margin-bottom:4px}
-.pi:hover{border-color:var(--bd);background:var(--sf2)}
-.pi.active{border-color:var(--or);background:rgba(249,115,22,.07)}
+.pi{padding:9px 10px;border-radius:4px;border:1px solid transparent;border-left:3px solid transparent;cursor:pointer;margin-bottom:3px;transition:all .15s}
+.pi:hover{border-color:var(--bd);border-left-color:var(--mt);background:rgba(255,255,255,.03)}
+.pi.active{border-color:rgba(245,155,48,.2);border-left-color:var(--or);background:rgba(245,155,48,.06)}
 .pi-name{font-weight:600;font-size:12px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pi-loc{font-size:10px;color:var(--mt);margin-bottom:4px}
 .pi-bar{height:3px;background:var(--sf2);border-radius:2px;overflow:hidden;margin-bottom:3px}
@@ -305,18 +328,15 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 
 /* KPI */
 .krow{display:grid;gap:9px;perspective:900px}
-.kpi{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:12px 13px;position:relative;overflow:hidden;cursor:pointer;
-  transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease,border-color .2s ease;
-  transform-style:preserve-3d;will-change:transform,box-shadow}
-.kpi:hover{transform:perspective(600px) translateZ(14px) rotateX(6deg);
-  box-shadow:0 16px 40px rgba(0,0,0,.35),0 6px 16px rgba(0,0,0,.2);border-color:rgba(255,255,255,.12)}
-.kpi:active{transform:perspective(600px) translateZ(3px) rotateX(0deg) scale(0.97);
-  box-shadow:0 4px 12px rgba(0,0,0,.2);transition-duration:.08s,.08s,.08s}
-.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;transition:height .2s ease}
-.kpi:hover::before{height:3px}
-.ko::before{background:var(--or)}.kg::before{background:var(--gn)}.kb::before{background:var(--bl)}
-.ky::before{background:var(--yw)}.kr::before{background:var(--rd)}.kp::before{background:var(--pu)}
-.kl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mt);margin-bottom:3px}
+.kpi{background:var(--sf);border:1px solid var(--bd);border-left:3px solid var(--bd);border-radius:6px;padding:13px 14px;position:relative;overflow:hidden;cursor:pointer;
+  transition:border-color .2s,box-shadow .2s,background .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.kpi:hover{background:var(--sf2);box-shadow:0 4px 16px rgba(0,0,0,.3)}
+.kpi:active{transform:scale(.98);transition-duration:.08s}
+.kpi::before{display:none}
+.ko{border-left-color:var(--or)}.kg{border-left-color:var(--gn)}.kb{border-left-color:var(--bl)}
+.ky{border-left-color:var(--yw)}.kr{border-left-color:var(--rd)}.kp{border-left-color:var(--pu)}
+.kl{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;color:var(--mt);margin-bottom:5px;font-weight:600}
 .kv{font-family:var(--fd);font-size:22px;letter-spacing:1px;line-height:1;transition:color .3s ease}
 .ks{font-size:10px;color:var(--mt);margin-top:2px}
 /* Skeleton shimmer */
@@ -331,8 +351,8 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 /* theme switching via body opacity — lihat toggleTheme() di core.js */
 
 /* CARDS */
-.card{background:var(--sf);border:1px solid var(--bd);border-radius:10px;padding:13px}
-.ct{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--mt);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:6px;padding:13px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+.ct{font-size:9px;text-transform:uppercase;text-transform:uppercase;letter-spacing:1px;color:var(--mt);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px}
 .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
@@ -349,7 +369,7 @@ body{background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:13px;h
 
 /* TABLE */
 .tbl{width:100%;border-collapse:collapse;font-size:11px}
-.tbl th{font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:var(--mt);padding:5px 7px;text-align:left;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:2;background:var(--sf);transform:translate3d(0,0,0)}
+.tbl th{text-transform:uppercase;letter-spacing:.5px;font-size:9px;font-size:9px;text-transform:uppercase;letter-spacing:.7px;color:var(--mt);padding:5px 7px;text-align:left;border-bottom:1px solid var(--bd);position:sticky;top:0;z-index:2;background:var(--sf);transform:translate3d(0,0,0)}
 .tbl td{padding:6px 7px;border-bottom:1px solid rgba(30,45,69,.4)}
 .tbl tr:hover td{background:rgba(255,255,255,.02)}
 .tbl tr:last-child td{border-bottom:none}
@@ -651,6 +671,121 @@ select.fi{color-scheme:dark}
 .dmeta{font-size:11px;color:var(--mt);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 script{display:none!important;visibility:hidden!important;position:absolute!important;}
+
+/* ═══════════════════════════════════════════════════════
+   INDUSTRIAL EXECUTIVE DASHBOARD — ATW Solar
+   Design System v2.0
+═══════════════════════════════════════════════════════ */
+
+/* KPI value number — large, commanding */
+.kv{font-family:var(--fd);font-size:26px;letter-spacing:1px;line-height:1;margin-bottom:2px}
+.ks{font-size:9px;color:var(--mt);letter-spacing:.3px;margin-top:4px}
+
+/* Section title — clean rule */
+.ct{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--mt);padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:flex-start;gap:6px}
+.ct::before{content:'';display:inline-block;width:3px;height:10px;background:var(--or);border-radius:2px;flex-shrink:0}
+
+/* Data table — executive grid */
+.tbl{width:100%;border-collapse:collapse;font-size:11px}
+.tbl th{padding:7px 10px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mt);background:var(--sf2);border-bottom:1px solid var(--bd);white-space:nowrap;position:sticky;top:0;z-index:2}
+.tbl td{padding:8px 10px;border-bottom:1px solid rgba(31,53,80,.5);color:var(--tx);font-size:11px;vertical-align:middle}
+.tbl tr:hover td{background:rgba(245,155,48,.03)}
+.tbl tr:last-child td{border-bottom:none}
+
+/* Form inputs — crisp professional */
+.fi{background:var(--ib);border:1px solid var(--bd);border-radius:4px;color:var(--tx);padding:7px 10px;font-family:var(--fb);font-size:12px;width:100%;transition:border-color .15s,background .15s;outline:none;color-scheme:dark}
+.fi:focus{border-color:var(--or);background:rgba(245,155,48,.04)}
+.fi::placeholder{color:var(--mt)}
+select.fi{cursor:pointer}
+
+/* Badge pills — crisp */
+.pill{font-size:9px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap}
+
+/* Modal — executive dialog */
+.ov{position:fixed;inset:0;background:rgba(8,16,28,.75);backdrop-filter:blur(4px);z-index:9999;display:none;align-items:center;justify-content:center}
+.ov.open{display:flex;animation:ovIn .18s ease}
+@keyframes ovIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--sf);border:1px solid var(--bd);border-top:3px solid var(--or);border-radius:6px;padding:20px;max-width:520px;width:calc(100% - 32px);max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.wide{max-width:660px}
+.mtitle{font-family:var(--fd);font-size:16px;letter-spacing:2px;color:var(--or);display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--bd)}
+.mclose{background:none;border:none;color:var(--mt);cursor:pointer;font-size:18px;padding:0;transition:color .15s}.mclose:hover{color:var(--or)}
+.mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--bd)}
+.fl{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mt);display:block;margin-bottom:4px}
+.fg{margin-bottom:10px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* Light mode overrides */
+:root.light .tbl th{background:#eef3f9;color:#4a6880}
+:root.light .tbl td{border-bottom-color:rgba(196,212,228,.5);color:#0a1828}
+:root.light .fi{background:#f4f7fb;border-color:#c4d4e4;color:#0a1828;color-scheme:light}
+:root.light .fi:focus{border-color:var(--or);background:#fff}
+:root.light .modal{background:#fff;border-color:#c4d4e4}
+:root.light .ov{background:rgba(10,24,40,.6)}
+
+
+/* ── PORTFOLIO OVERVIEW — Executive Layout ─────────────────── */
+/* KPI strip — compact & scannable */
+#tp-overview .kpi { padding:10px 12px }
+#tp-overview .kv  { font-size:22px; letter-spacing:.5px; line-height:1.1; margin-bottom:1px }
+#tp-overview .kl  { font-size:8px; letter-spacing:1.2px; margin-bottom:4px }
+#tp-overview .ks  { font-size:8.5px; margin-top:3px; line-height:1.3 }
+
+/* Project Status Cards — uniform, clean */
+#projStatusCards .psc {
+  background:var(--sf);
+  border:1px solid var(--bd);
+  border-left:3px solid var(--or);
+  border-radius:6px;
+  padding:14px 16px;
+  box-shadow:0 2px 8px rgba(0,0,0,.18);
+  transition:box-shadow .2s, border-color .2s;
+}
+#projStatusCards .psc:hover {
+  box-shadow:0 4px 16px rgba(0,0,0,.28);
+  border-left-color:var(--or);
+}
+
+/* Bottom 3-panel row */
+#tp-overview .g3 { 
+  display:grid;
+  grid-template-columns:1fr 1.2fr 1.2fr;
+  gap:10px;
+  align-items:start;
+}
+@media(max-width:1100px) { 
+  #tp-overview .g3 { grid-template-columns:1fr 1fr; }
+}
+
+/* Light mode adjustments */
+:root.light #tp-overview .kpi { background:#fff }
+:root.light #projStatusCards .psc { background:#fff; border-color:var(--bd) }
+
+
+/* ── CARD LINK — sama persis dengan .psc hover ─────────────── */
+.card-link {
+  cursor:pointer;
+  transition:transform .15s,border-color .15s,box-shadow .15s;
+  position:relative;
+}
+.card-link:hover {
+  transform:translateY(-2px);
+  border-color:rgba(249,115,22,.4);
+  box-shadow:0 6px 24px rgba(0,0,0,.3);
+}
+.card-link:active {
+  transform:translateY(0);
+  transition-duration:.08s;
+}
+
+.card-link .card-link-bar {
+  position:absolute;
+  bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--or),var(--yw));
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .2s ease;
+}
+.card-link:hover .card-link-bar { transform:scaleX(1) }
+
 </style>
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -743,7 +878,7 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
   <div class="tab" onclick="sw('wbs',this)" title="[6] WBS"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M9 6h11"/><path d="M9 12h11"/><path d="M9 18h11"/><path d="M3 6v.01"/><path d="M3 12v.01"/><path d="M3 18v.01"/></svg> WBS</div>
   <div class="tab" onclick="sw('daily',this)" title="[7] Daily Report"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01"/><path d="M12 14h4"/><path d="M8 18h.01"/><path d="M12 18h4"/></svg> Daily Report</div>
   <div class="tab" onclick="sw('cost',this)" title="[8] Cost/Finance"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><circle cx="12" cy="12" r="9"/><path d="M14.8 9A2 2 0 0 0 13 8h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1-1.8-1"/><line x1="12" y1="6" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="18"/></svg> Cost/Finance</div>
-  <div class="tab" onclick="sw('documents',this);_syncDocProjDropdown();renderDocs()" title="Master Dokumen List"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Dokumen</div>
+  <div class="tab" onclick="sw('documents',this);_syncDocProjDropdown();if(typeof DOCS!=='undefined'&&DOCS.length){renderDocs();}else{loadDocsFromSupabase().then(function(){_updateDocKPI();renderDocs();})}" title="Master Dokumen List"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Dokumen</div>
 </div>
 
 <!-- MAIN LAYOUT -->
@@ -776,11 +911,11 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
 
     <!-- ══ PORTFOLIO OVERVIEW ══ -->
     <div id="tp-overview" class="tp active">
-      <!-- KPI TOP ROW: 6 cards -->
-      <div class="krow" style="grid-template-columns:repeat(6,1fr)">
+      <!-- KPI TOP ROW: 7 cards -->
+      <div class="krow" style="grid-template-columns:repeat(7,1fr)">
         <div class="kpi ko" onclick="const te=document.querySelector('.tab[onclick*=\'projects\']');if(te)sw('projects',te)" title="🗂 Buka tab Projects"><div class="kl">Total Projects</div><div id="ov1" class="kv skel" style="color:var(--or)">0</div><div class="ks">Active portfolio</div></div>
         <div class="kpi kb" onclick="const te=document.querySelector('.tab[onclick*=\'manpower\']');if(te)sw('manpower',te)" title="👷 Buka tab Manpower"><div class="kl">Total Manhours Hari Ini</div><div id="ov2" class="kv skel" style="color:var(--bl)">0</div><div class="ks" id="ov2s">Plan: 0 jam</div></div>
-        <div class="kpi" style="background:var(--sf);border-color:var(--bd)" onclick="const te=document.querySelector('.tab[onclick*=\'projects\']');if(te)sw('projects',te)" title="📊 Buka tab Projects">
+        <div class="kpi kg" onclick="const te=document.querySelector('.tab[onclick*=\'projects\']');if(te)sw('projects',te)" title="📊 Buka tab Projects">
           <div class="kl">Status Portfolio</div>
           <div style="display:flex;gap:8px;align-items:baseline;margin-top:4px;flex-wrap:wrap">
             <span><span style="font-family:var(--fd);font-size:20px;color:var(--gn)" id="ovOT">0</span><span style="font-size:9px;color:var(--gn);margin-left:3px">OT</span></span>
@@ -792,22 +927,22 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
         <div class="kpi ky" onclick="const te=document.querySelector('.tab[onclick*=\'manpower\']');if(te)sw('manpower',te)" title="⏱ Buka tab Manpower"><div class="kl">Total Time Lost</div><div id="ov5" class="kv skel" style="color:var(--yw)">0 hr</div><div class="ks">Acc + Weather</div></div>
         <div class="kpi kg" onclick="const te=document.querySelector('.tab[onclick*=\'cost\']');if(te)sw('cost',te)" title="💰 Buka tab Cost/Finance">
           <div class="kl">Total Pengeluaran</div>
-          <div id="ov6" class="kv skel" style="color:var(--gn);font-size:15px">Rp 0</div>
+          <div id="ov6" class="kv skel" style="color:var(--gn);font-size:14px;letter-spacing:0">Rp 0</div>
           <div class="ks" id="ov6s">Procurement + OPEX</div>
         </div>
-        <div class="kpi" style="background:var(--sf);border-color:var(--bd)" onclick="const te=document.querySelector('.tab[onclick*=\'documents\']');if(te){sw('documents',te);_syncDocProjDropdown();renderDocs();}" title="📄 Buka tab Dokumen">
+        <div class="kpi kp" onclick="const te=document.querySelector('.tab[onclick*=\'documents\']');if(te){sw('documents',te);_syncDocProjDropdown();renderDocs();}" title="📄 Buka tab Dokumen">
           <div class="kl">Total Dokumen</div>
           <div id="ovDoc" class="kv skel" style="color:var(--pu)">0</div>
-          <div class="ks" id="ovDocS">IFC: 0 · Approved: 0</div>
+          <div class="ks" id="ovDocS" style="font-size:9px"></div>
         </div>
       </div>
 
       <!-- PROJECT STATUS CARDS -->
       <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--bd)">
           <div style="display:flex;align-items:center;gap:10px">
-            <div style="width:24px;height:2px;background:var(--or)"></div>
-            <div style="font-family:var(--fd);font-size:13px;letter-spacing:2px;color:var(--mt)">PROJECT STATUS CARDS</div>
+            <div style="width:3px;height:16px;background:var(--or);border-radius:2px"></div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--mt)">Project Status Cards</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
             <input class="fi" id="ovSearch" placeholder="Cari project..." oninput="renderProjStatusCards()" style="padding:4px 9px;font-size:11px;width:160px">
@@ -823,7 +958,8 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
       <!-- 3-panel row: Weather · Accident · Procurement -->
       <div class="g3">
         <!-- WEATHER -->
-        <div class="card">
+        <div class="card card-link" onclick="const te=document.querySelector('.tab[onclick*=\'daily\']');if(te)sw('daily',te)" title="Buka Daily Report">
+          <span class="card-link-bar"></span>
           <div class="ct"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M12 2v2M4.93 4.93l1.41 1.41M20 12h2M19.07 4.93l-1.41 1.41M15.947 12.65a4 4 0 0 0-5.925-4.128"/><path d="M13 22H7a5 5 0 1 1 4.9-6H13a3 3 0 0 1 0 6z"/></svg> WEATHER — ALL SITES <span style="color:var(--gn);animation:pulse 3s infinite;font-size:10px">● LIVE</span></div>
           <div class="wg" id="weatherGrid"></div>
           <div style="margin-top:9px;text-align:right">
@@ -832,9 +968,10 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
         </div>
 
         <!-- ACCIDENT LOG -->
-        <div class="card">
-          <div class="ct"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><rect x="2" y="6" width="20" height="15" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="9.5" y1="13.5" x2="14.5" y2="13.5"/></svg> ACCIDENT LOG — PORTFOLIO
-            <button class="btn btn-sm bp" onclick="openModal('addAccident')">＋ Input</button>
+        <div class="card card-link" title="Buka Manpower">
+          <span class="card-link-bar"></span>
+          <div class="ct" onclick="const te=document.querySelector('.tab[onclick*=\'manpower\']');if(te)sw('manpower',te)" style="cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><rect x="2" y="6" width="20" height="15" rx="2"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="12" y1="11" x2="12" y2="16"/><line x1="9.5" y1="13.5" x2="14.5" y2="13.5"/></svg> ACCIDENT LOG — PORTFOLIO
+            <button class="btn btn-sm bp" onclick="event.stopPropagation();openModal('addAccident')">＋ Input</button>
           </div>
           <div id="accLog"></div>
           <div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--bd)">
@@ -854,7 +991,8 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
         </div>
 
         <!-- PROCUREMENT STATUS -->
-        <div class="card">
+        <div class="card card-link" onclick="const te=document.querySelector('.tab[onclick*=\'procurement\']');if(te)sw('procurement',te)" title="Buka Procurement">
+          <span class="card-link-bar"></span>
           <div class="ct"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg> PROCUREMENT STATUS</div>
           <div class="proc-grid" id="procGrid"></div>
         </div>
@@ -980,8 +1118,8 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
           </select>
           <select class="fi" style="width:auto;padding:4px 9px;font-size:11px" id="procFilt" onchange="renderProc()">
             <option value="">Semua Status</option>
-            <option>Overdue</option><option>Due Today</option><option>In Transit</option>
-            <option>On Site</option><option>Waiting Approval</option><option>PO Issued</option>
+            <option>Waiting Approval</option><option>PO Issued</option><option>On Production</option>
+            <option>In Transit</option><option>On Site</option><option>Done</option>
           </select>
           <select class="fi" style="width:auto;padding:4px 9px;font-size:11px" id="procFiltKat" onchange="renderProc()">
             <option value="">Semua Kategori</option>
@@ -1228,7 +1366,7 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
   <!-- Controls bar -->
   <div class="card" style="padding:10px 14px">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <select class="fi" id="docFiltProj" onchange="renderDocs()" style="width:auto;min-width:185px;padding:4px 9px;font-size:11px">
+      <select class="fi" id="docFiltProj" onchange="this._docFiltManual=true;renderDocs()" style="width:auto;min-width:185px;padding:4px 9px;font-size:11px">
         <option value="">Semua Project</option>
       </select>
       <select class="fi" id="docFiltKat" onchange="renderDocs()" style="width:auto;min-width:160px;padding:4px 9px;font-size:11px">
@@ -1242,6 +1380,7 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
       <input class="fi" id="docSearch" placeholder="Cari dokumen..." oninput="renderDocs()" style="width:165px;padding:4px 9px;font-size:11px">
       <div style="margin-left:auto;display:flex;gap:6px">
         <button class="btn btn-sm" style="border-color:var(--pu);color:var(--pu)" onclick="exportDocsPDF()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Export PDF</button>
+        <button class="btn btn-sm edit-only" style="border-color:var(--pu);color:var(--pu)" onclick="openCloneDocModal()" title="Clone semua dokumen dari project lain ke project ini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:4px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Clone Dokumen</button>
         <button class="btn btn-sm bg edit-only" onclick="openDocModal()">＋ Tambah Dokumen</button>
       </div>
     </div>
@@ -1572,7 +1711,7 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
   </div>
   <div class="f2">
     <div class="fg"><label class="fl">Supplier</label><input class="fi" id="pSup" placeholder="PT Solar Utama"></div>
-    <div class="fg"><label class="fl">Status</label><select class="fi" id="pStat" onchange="toggleProcCost(this.value)"><option>Waiting Approval</option><option>PO Issued</option><option>In Transit</option><option>On Site</option><option>Due Today</option><option>Overdue</option></select></div>
+    <div class="fg"><label class="fl">Status</label><select class="fi" id="pStat" onchange="toggleProcCost(this.value)"><option>Waiting Approval</option><option>PO Issued</option><option>On Production</option><option>In Transit</option><option>On Site</option><option>Done</option></select></div>
   </div>
 
   <!-- RAB Link Section -->
@@ -1830,6 +1969,47 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
   <div class="mfoot">
     <button class="btn" onclick="cm('cloneRab')">Batal</button>
     <button class="btn" style="background:var(--or);color:#fff;border-color:var(--or)" onclick="executeCloneRab()">⧉ Clone RAB</button>
+  </div>
+</div></div>
+
+<!-- CLONE DOKUMEN -->
+<div class="ov" id="ov-cloneDoc" onclick="if(event.target===this)cm('cloneDoc')">
+<div class="modal" style="max-width:520px">
+  <div class="mtitle" style="color:var(--pu)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>CLONE DOKUMEN — Salin Dokumen Antar Project<button class="mclose" onclick="cm('cloneDoc')">✕</button></div>
+  <div style="background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--mt)">
+    <b style="color:var(--pu)">Yang akan di-copy:</b> Nama Dokumen, No. Dokumen, Kategori, Revisi, Tanggal, Status, Submitted By, Approved By, Catatan, Link.<br>
+    <b style="color:var(--rd)">Yang TIDAK di-copy:</b> ID dokumen (dibuat baru), relasi project asli.
+  </div>
+  <div class="f2" style="align-items:end">
+    <div class="fg">
+      <label class="fl">Clone Dokumen dari Project</label>
+      <select class="fi" id="cloneDocSrc" onchange="_onCloneDocSrcChange()">
+        <option value="">— Pilih Project Sumber —</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Clone ke Project</label>
+      <div id="cloneDocDestInfo" style="padding:8px 12px;background:var(--sf2);border-radius:6px;font-size:12px;font-weight:600;color:var(--pu)">—</div>
+    </div>
+  </div>
+  <div style="background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.2);border-radius:7px;padding:9px 12px;margin:10px 0;font-size:11px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="cloneDocMerge" style="accent-color:var(--pu)">
+      <span><b>Merge</b> — tambahkan ke dokumen yang sudah ada (tidak hapus data existing). Jika tidak dicentang, dokumen lama akan <b style="color:var(--rd)">diganti</b>.</span>
+    </label>
+  </div>
+  <div style="background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.2);border-radius:7px;padding:9px 12px;margin:0 0 10px;font-size:11px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="cloneDocResetStatus" style="accent-color:var(--pu)">
+      <span><b>Reset Status</b> — ubah semua dokumen clone menjadi <b>Submitted</b> dan kosongkan Approved By.</span>
+    </label>
+  </div>
+  <div id="cloneDocPreview" style="max-height:200px;overflow-y:auto;background:var(--sf2);border-radius:7px;padding:8px 12px;font-size:10px;color:var(--mt);margin-bottom:4px">
+    <div style="color:var(--mt);font-style:italic">Pilih project sumber untuk melihat preview dokumen...</div>
+  </div>
+  <div class="mfoot">
+    <button class="btn" onclick="cm('cloneDoc')">Batal</button>
+    <button class="btn" id="btnExecCloneDoc" style="background:var(--pu);color:#fff;border-color:var(--pu)" onclick="executeCloneDocAll()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:4px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Clone Dokumen</button>
   </div>
 </div></div>
 
@@ -2478,5 +2658,9 @@ script{display:none!important;visibility:hidden!important;position:absolute!impo
 <script src="js/patch1.js"></script>
 
 <script src="js/patch2.js"></script>
+<script src="js/patch3.js"></script>
+<script src="js/patch4.js"></script>
+<script src="js/patch5.js"></script>
+<script src="js/patch6.js"></script>
 </body>
 </html>
