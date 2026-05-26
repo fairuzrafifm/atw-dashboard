@@ -1379,8 +1379,8 @@ select.fi{cursor:pointer}
       </select>
       <input class="fi" id="docSearch" placeholder="Cari dokumen..." oninput="renderDocs()" style="width:165px;padding:4px 9px;font-size:11px">
       <div style="margin-left:auto;display:flex;gap:6px">
-        <button class="btn btn-sm" style="border-color:var(--pu);color:var(--pu)" onclick="exportDocsPDF()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Export PDF</button>
         <button class="btn btn-sm edit-only" style="border-color:var(--pu);color:var(--pu)" onclick="openCloneDocModal()" title="Clone semua dokumen dari project lain ke project ini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:4px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Clone Dokumen</button>
+        <button class="btn btn-sm" style="border-color:var(--pu);color:var(--pu)" onclick="exportDocsPDF()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Export PDF</button>
         <button class="btn btn-sm bg edit-only" onclick="openDocModal()">＋ Tambah Dokumen</button>
       </div>
     </div>
@@ -1977,7 +1977,7 @@ select.fi{cursor:pointer}
 <div class="modal" style="max-width:520px">
   <div class="mtitle" style="color:var(--pu)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block;margin-right:6px"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>CLONE DOKUMEN — Salin Dokumen Antar Project<button class="mclose" onclick="cm('cloneDoc')">✕</button></div>
   <div style="background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.2);border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:11px;color:var(--mt)">
-    <b style="color:var(--pu)">Yang akan di-copy:</b> Nama Dokumen, No. Dokumen, Kategori, Revisi, Tanggal, Status, Submitted By, Approved By, Catatan, Link.<br>
+    <b style="color:var(--pu)">Yang akan di-copy:</b> Nama, No. Dokumen, Kategori, Revisi, Tanggal, Status, Submitted By, Approved By, Catatan, Link.<br>
     <b style="color:var(--rd)">Yang TIDAK di-copy:</b> ID dokumen (dibuat baru), relasi project asli.
   </div>
   <div class="f2" style="align-items:end">
@@ -1995,7 +1995,7 @@ select.fi{cursor:pointer}
   <div style="background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.2);border-radius:7px;padding:9px 12px;margin:10px 0;font-size:11px">
     <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
       <input type="checkbox" id="cloneDocMerge" style="accent-color:var(--pu)">
-      <span><b>Merge</b> — tambahkan ke dokumen yang sudah ada (tidak hapus data existing). Jika tidak dicentang, dokumen lama akan <b style="color:var(--rd)">diganti</b>.</span>
+      <span><b>Merge</b> — tambahkan ke dokumen yang sudah ada. Jika tidak dicentang, dokumen lama akan <b style="color:var(--rd)">diganti</b>.</span>
     </label>
   </div>
   <div style="background:rgba(139,92,246,.07);border:1px solid rgba(139,92,246,.2);border-radius:7px;padding:9px 12px;margin:0 0 10px;font-size:11px">
@@ -2655,6 +2655,21 @@ select.fi{cursor:pointer}
   <div class="notif-hdr"><span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;display:inline-block"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> ALERTS</span><span style="font-size:9px;color:var(--mt);font-weight:400" id="notifTime"></span></div>
   <div id="notifList"><div class="notif-empty">Tidak ada alert aktif ✓</div></div>
 </div>
+<!-- ═══════════════════════════════════════════════════════════
+     PATCH SYSTEM — patch1 s/d patch7 (FINAL, tidak ada patch8+)
+     ───────────────────────────────────────────────────────────
+     patch1  : User registration, admin approval, edit lock
+     patch2  : Migrasi GSheet → Supabase, retry queue, offline
+     patch3  : Realtime history, lock WBS/Daily, auto-refresh 10m
+     patch4  : Lazy loading project-scoped (Phase 1 & 2)
+     patch5  : Procurement KPI date-based, status workflow, showConfirm
+     patch6  : Clone Dokumen bulk (openCloneDocModal, executeCloneDocAll)
+     patch7  : S-Curve redesign Chart.js, WBS table-layout fix (TERAKHIR)
+     ───────────────────────────────────────────────────────────
+     ⚠ Semua perbaikan selanjutnya langsung ke file sumber:
+       core.js / projects.js / wbs.js / reports.js / scurve.js
+       documents.js / cost-rab.js / manpower.js / daily.js / gantt.js
+     ═══════════════════════════════════════════════════════════ -->
 <script src="js/patch1.js"></script>
 
 <script src="js/patch2.js"></script>
@@ -2662,5 +2677,6 @@ select.fi{cursor:pointer}
 <script src="js/patch4.js"></script>
 <script src="js/patch5.js"></script>
 <script src="js/patch6.js"></script>
+<script src="js/patch7.js"></script>
 </body>
 </html>
